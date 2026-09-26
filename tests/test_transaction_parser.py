@@ -408,3 +408,48 @@ REF-20261028
     assert t1.debit is None
     assert t1.counterparty == "ALPHA TRADERS"
     assert "Contract invoice" in t1.description
+
+
+def test_parse_100_transactions_multi_page_resilience():
+    """Verify parser seamlessly handles 100 transactions spanning multiple pages with running headers."""
+    pages = []
+    # 5 pages, 20 transactions per page
+    for p in range(1, 6):
+        page_lines = [
+            "AML Investigation Copilot — Corporate Statement",
+            f"Customer Name: Enterprise Global Holdings",
+            f"Account Number: ACC-CORP-10088",
+            f"Statement Period: 01 Oct 2026 - 31 Oct 2026",
+            f"Page {p} of 5",
+            # Single-line multi-column table header
+            "Transaction ID   Date   Flow   Amount (INR)   Counterparty   Description   Reference",
+        ]
+        for i in range(1, 21):
+            txn_num = (p - 1) * 20 + i
+            is_credit = (txn_num % 2 == 0)
+            flow = "CREDIT" if is_credit else "DEBIT"
+            amt = f"{50000 + txn_num * 1000:,.2f}"
+            page_lines.extend([
+                f"TXN{txn_num:03d}",
+                f"2026-10-{min(txn_num, 28):02d}",
+                flow,
+                amt,
+                f"COUNTERPARTY {txn_num}",
+                f"Payment transfer for service batch {txn_num}",
+                f"REF-{txn_num:05d}",
+            ])
+        pages.append(PDFPage(page_number=p, text="\n".join(page_lines), is_empty=False))
+
+    extraction = PDFDocumentExtraction(
+        file_path="stress_100.pdf",
+        file_name="stress_100.pdf",
+        total_pages=5,
+        pages=pages,
+    )
+
+    stmt = parse_transactions(extraction)
+    assert len(stmt.transactions) == 100
+    assert stmt.customer_name == "Enterprise Global Holdings"
+    assert stmt.account_number == "ACC-CORP-10088"
+    assert stmt.transactions[0].transaction_id == "TXN001"
+    assert stmt.transactions[-1].transaction_id == "TXN100"

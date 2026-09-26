@@ -69,11 +69,14 @@ class InvestigationEventBus:
             except Exception as exc:
                 logger.debug(f"[EventBus {self.investigation_id}] Subscriber dispatch error: {exc}")
 
-    async def subscribe(self) -> AsyncIterator[InvestigationEvent]:
+    async def subscribe(
+        self, heartbeat_interval: Optional[float] = None
+    ) -> AsyncIterator[Optional[InvestigationEvent]]:
         """Subscribe to this investigation's event stream.
 
         First replays all previously captured events, then yields live events
         as they occur until investigation conclusion.
+        If heartbeat_interval is provided, yields None if no event occurs within the interval.
         """
         self._ensure_loop()
         queue: asyncio.Queue[Optional[InvestigationEvent]] = asyncio.Queue()
@@ -90,7 +93,15 @@ class InvestigationEventBus:
 
         try:
             while True:
-                item = await queue.get()
+                if heartbeat_interval and heartbeat_interval > 0:
+                    try:
+                        item = await asyncio.wait_for(queue.get(), timeout=heartbeat_interval)
+                    except asyncio.TimeoutError:
+                        yield None
+                        continue
+                else:
+                    item = await queue.get()
+
                 if item is None:
                     break
                 yield item

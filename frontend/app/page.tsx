@@ -28,6 +28,7 @@ import {
   EngineState,
   InvestigationEvent,
   InvestigationReport,
+  InvestigationStatusResponse,
   TelemetryLog,
 } from "@/types";
 import {
@@ -37,6 +38,7 @@ import {
   Layers,
   Activity,
   AlertTriangle,
+  AlertCircle,
   Calendar,
   User,
   ArrowRight,
@@ -58,8 +60,10 @@ export default function Home() {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isBackendOnline, setIsBackendOnline] = useState<boolean>(true);
   const [logs, setLogs] = useState<TelemetryLog[]>([]);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const activeSubscriptionRef = useRef<(() => void) | null>(null);
+  const pollTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const addLog = (
     source: string,
@@ -91,6 +95,11 @@ export default function Home() {
     return () => {
       if (activeSubscriptionRef.current) {
         activeSubscriptionRef.current();
+        activeSubscriptionRef.current = null;
+      }
+      if (pollTimerRef.current) {
+        clearInterval(pollTimerRef.current);
+        pollTimerRef.current = null;
       }
     };
   }, []);
@@ -196,6 +205,10 @@ export default function Home() {
 
   // Demo mode toggle using real SSE pipeline
   const handleToggleDemoMode = async () => {
+    if (pollTimerRef.current) {
+      clearInterval(pollTimerRef.current);
+      pollTimerRef.current = null;
+    }
     if (isDemoMode) {
       if (activeSubscriptionRef.current) {
         activeSubscriptionRef.current();
@@ -204,6 +217,7 @@ export default function Home() {
       setIsDemoMode(false);
       setCurrentReport(null);
       setCurrentMarkdown("");
+      setErrorMessage(null);
       setEngineState("IDLE");
       setActiveNode(null);
       setActiveTool(null);
@@ -216,6 +230,7 @@ export default function Home() {
 
     try {
       setIsLoading(true);
+      setErrorMessage(null);
       setEngineState("QUEUED");
       setActiveNode(null);
       setRevisionCount(0);
@@ -228,6 +243,43 @@ export default function Home() {
       const invId = startRes.investigation_id;
       addLog("System", `Demo investigation queued (${invId}). Subscribing to SSE stream...`, "info");
 
+      let isFinished = false;
+      const finishDemo = (statusData: any) => {
+        if (isFinished) return;
+        if (statusData.report) {
+          isFinished = true;
+          if (pollTimerRef.current) {
+            clearInterval(pollTimerRef.current);
+            pollTimerRef.current = null;
+          }
+          if (activeSubscriptionRef.current) {
+            activeSubscriptionRef.current();
+            activeSubscriptionRef.current = null;
+          }
+          setCurrentReport(statusData.report);
+          setCurrentMarkdown(statusData.markdown || "");
+          setEngineState("COMPLETE");
+          setActiveNode("report");
+          addLog(
+            "System",
+            `Demo investigation concluded (${statusData.execution_time_seconds || 1.2}s). Report: ${statusData.report.report_id}`,
+            "success"
+          );
+          setIsLoading(false);
+        }
+      };
+
+      // Polling fallback
+      pollTimerRef.current = setInterval(async () => {
+        if (isFinished) return;
+        try {
+          const statusData = await getInvestigation(invId);
+          if (statusData.report) finishDemo(statusData);
+        } catch {
+          // ignore
+        }
+      }, 1000);
+
       // Subscribe to real Server-Sent Events stream
       activeSubscriptionRef.current = subscribeToInvestigationEvents(
         invId,
@@ -236,42 +288,42 @@ export default function Home() {
           console.warn("[Demo SSE Error]", err);
         },
         async () => {
-          // Terminal completion callback
-          try {
-            const statusData = await getInvestigation(invId);
-            if (statusData.report) {
-              setCurrentReport(statusData.report);
-              setCurrentMarkdown(statusData.markdown || "");
-              setEngineState("COMPLETE");
-              setActiveNode("report");
-              addLog(
-                "System",
-                `Demo investigation concluded (${statusData.execution_time_seconds}s). Report: ${statusData.report.report_id}`,
-                "success"
-              );
+          for (let attempt = 0; attempt < 8; attempt++) {
+            if (isFinished) break;
+            try {
+              const statusData = await getInvestigation(invId);
+              if (statusData.report) {
+                finishDemo(statusData);
+                break;
+              }
+            } catch (fetchErr: any) {
+              console.warn(`[Demo Status Retry ${attempt + 1}]`, fetchErr);
             }
-          } catch (fetchErr: any) {
-            addLog("System", `Failed to retrieve demo report: ${fetchErr.message}`, "error");
-          } finally {
-            setIsLoading(false);
+            await new Promise((r) => setTimeout(r, 400));
           }
         }
       );
     } catch (err: any) {
       addLog("Demo Engine", `Failed to start demo investigation: ${err.message}`, "error");
       setEngineState("ERROR");
+      setErrorMessage(err.message || "Failed to start demo investigation.");
       setIsLoading(false);
     }
   };
 
-  // Live PDF investigation submission with real-time SSE streaming
+  // Live PDF investigation submission with dual real-time SSE streaming & polling fallback
   const handleStartInvestigation = async (file: File, question: string) => {
     if (activeSubscriptionRef.current) {
       activeSubscriptionRef.current();
       activeSubscriptionRef.current = null;
     }
+    if (pollTimerRef.current) {
+      clearInterval(pollTimerRef.current);
+      pollTimerRef.current = null;
+    }
 
     setIsLoading(true);
+    setErrorMessage(null);
     setEngineState("QUEUED");
     setActiveNode(null);
     setActiveTool(null);
@@ -286,44 +338,95 @@ export default function Home() {
     try {
       const startRes = await startInvestigation(file, question);
       const invId = startRes.investigation_id;
-      addLog("System", `Investigation queued [${invId}]. Connecting to real-time SSE telemetry...`, "info");
+      addLog("System", `Investigation queued [${invId}]. Connecting to real-time SSE telemetry & status monitor...`, "info");
 
-      // Subscribe to real Server-Sent Events stream
+      let isFinished = false;
+
+      const finishInvestigation = (statusData: InvestigationStatusResponse) => {
+        if (isFinished) return;
+        if (statusData.report) {
+          isFinished = true;
+          if (pollTimerRef.current) {
+            clearInterval(pollTimerRef.current);
+            pollTimerRef.current = null;
+          }
+          if (activeSubscriptionRef.current) {
+            activeSubscriptionRef.current();
+            activeSubscriptionRef.current = null;
+          }
+          setCurrentReport(statusData.report);
+          setCurrentMarkdown(statusData.markdown || "");
+          setEngineState("COMPLETE");
+          setActiveNode("report");
+          addLog(
+            "System",
+            `Investigation concluded (${statusData.execution_time_seconds || 0}s). Report ID: ${statusData.report.report_id}`,
+            "success"
+          );
+          // Switch to report tab upon completion
+          setActiveTab("report");
+          setIsLoading(false);
+          setErrorMessage(null);
+        } else if (statusData.status === "FAILED" || statusData.error) {
+          isFinished = true;
+          if (pollTimerRef.current) {
+            clearInterval(pollTimerRef.current);
+            pollTimerRef.current = null;
+          }
+          if (activeSubscriptionRef.current) {
+            activeSubscriptionRef.current();
+            activeSubscriptionRef.current = null;
+          }
+          setEngineState("ERROR");
+          const errorText = statusData.error || "Investigation failed on server.";
+          setErrorMessage(errorText);
+          addLog("Error", errorText, "error");
+          setIsLoading(false);
+        }
+      };
+
+      // 1. Rock-solid polling fallback every 1.5s
+      pollTimerRef.current = setInterval(async () => {
+        if (isFinished) return;
+        try {
+          const statusData = await getInvestigation(invId);
+          if (statusData.report || statusData.status === "FAILED" || statusData.error) {
+            finishInvestigation(statusData);
+          }
+        } catch (pollErr: any) {
+          console.warn("[Poll status check]", pollErr);
+        }
+      }, 1500);
+
+      // 2. Real-time Server-Sent Events stream for instant live topology transitions
       activeSubscriptionRef.current = subscribeToInvestigationEvents(
         invId,
         handleLiveEvent,
         (err) => {
-          console.warn("[Investigation SSE]", err);
+          console.warn("[Investigation SSE warning - polling fallback is active]:", err);
         },
         async () => {
-          try {
-            const statusData = await getInvestigation(invId);
-            if (statusData.report) {
-              setCurrentReport(statusData.report);
-              setCurrentMarkdown(statusData.markdown || "");
-              setEngineState("COMPLETE");
-              setActiveNode("report");
-              addLog(
-                "System",
-                `Investigation concluded (${statusData.execution_time_seconds}s). Report ID: ${statusData.report.report_id}`,
-                "success"
-              );
-              // Switch to report tab upon completion
-              setActiveTab("report");
-            } else if (statusData.error) {
-              setEngineState("ERROR");
-              addLog("Error", statusData.error, "error");
+          // Terminal completion callback: retry fetching status up to 10 times with 500ms spacing
+          for (let attempt = 0; attempt < 10; attempt++) {
+            if (isFinished) break;
+            try {
+              const statusData = await getInvestigation(invId);
+              if (statusData.report || statusData.status === "FAILED" || statusData.error) {
+                finishInvestigation(statusData);
+                break;
+              }
+            } catch (statusErr: any) {
+              console.warn(`[Investigation Status Retry ${attempt + 1}]`, statusErr);
             }
-          } catch (statusErr: any) {
-            addLog("Error", `Failed to retrieve completed report: ${statusErr.message}`, "error");
-          } finally {
-            setIsLoading(false);
+            await new Promise((r) => setTimeout(r, 500));
           }
         }
       );
     } catch (err: any) {
       setEngineState("ERROR");
-      addLog("Error", err.message || "Failed to initiate investigation.", "error");
+      const errDetail = err.message || "Failed to initiate investigation.";
+      setErrorMessage(errDetail);
+      addLog("Error", errDetail, "error");
       setIsLoading(false);
     }
   };
@@ -388,6 +491,22 @@ export default function Home() {
                   )}
                 </div>
               </div>
+
+              {errorMessage && (
+                <div className="p-4 rounded-xl bg-rose-950/70 border border-rose-500/50 text-rose-200 flex items-start space-x-3 shadow-lg">
+                  <AlertCircle className="w-5 h-5 text-rose-400 shrink-0 mt-0.5" />
+                  <div className="flex-1">
+                    <div className="font-bold text-sm">Investigation Notice</div>
+                    <div className="text-xs text-rose-300 mt-1 font-mono break-all">{errorMessage}</div>
+                  </div>
+                  <button
+                    onClick={() => setErrorMessage(null)}
+                    className="text-xs text-rose-400 hover:text-white px-2 py-1"
+                  >
+                    ✕
+                  </button>
+                </div>
+              )}
 
               {/* POST-COMPLETION TOP PROFILE & 4 KPI CARDS (PHASE 6) */}
               {currentReport && (
@@ -551,6 +670,21 @@ export default function Home() {
           {/* INVESTIGATE TAB */}
           {activeTab === "investigate" && (
             <div className="space-y-6">
+              {errorMessage && (
+                <div className="p-4 rounded-xl bg-rose-950/70 border border-rose-500/50 text-rose-200 flex items-start space-x-3 shadow-lg">
+                  <AlertCircle className="w-5 h-5 text-rose-400 shrink-0 mt-0.5" />
+                  <div className="flex-1">
+                    <div className="font-bold text-sm">Investigation Notice</div>
+                    <div className="text-xs text-rose-300 mt-1 font-mono break-all">{errorMessage}</div>
+                  </div>
+                  <button
+                    onClick={() => setErrorMessage(null)}
+                    className="text-xs text-rose-400 hover:text-white px-2 py-1"
+                  >
+                    ✕
+                  </button>
+                </div>
+              )}
               <InvestigationUploadForm
                 onSubmit={handleStartInvestigation}
                 isLoading={isLoading}

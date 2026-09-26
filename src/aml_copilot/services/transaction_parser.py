@@ -42,13 +42,23 @@ DATE_PATTERNS = [
 # Standard header / footer line patterns that occur across pages and tables
 _HEADER_FOOTER_PATTERNS = [
     # Page numbers
-    re.compile(r"(?i)^Page\s+\d+(\s+of\s+\d+)?$"),
+    re.compile(r"(?i)^Page\s+\d+(\s*[/of]\s*\d+)?$"),
+    re.compile(r"(?i)^-?\s*Page\s+\d+\s*-?$"),
+    re.compile(r"(?i)^-?\s*\d+\s*(of\s*\d+)?\s*-?$"),
+    re.compile(r"(?i)^Page\s*:\s*\d+(\s*[/of]\s*\d+)?$"),
     # Document title / header banners
     re.compile(r"(?i)^AML Investigation Copilot.*"),
     re.compile(r"(?i)^Synthetic (Bank )?Transaction Statement.*"),
     re.compile(r"(?i)^Synthetic Stress Statement.*"),
     re.compile(r"(?i)^Bank Statement.*"),
-    # Column header labels
+    # Multi-column table header lines (must have Txn/Transaction AND Date AND an amount/flow indicator)
+    re.compile(
+        r"(?i)^.*?\b(Txn|Transaction)\b.*?\bDate\b.*?\b(Amount|Debit|Credit|Flow|Balance|Description|Particulars)\b.*$"
+    ),
+    re.compile(
+        r"(?i)^.*?\bDate\b.*?\b(Txn|Transaction)\b.*?\b(Amount|Debit|Credit|Flow|Balance|Description|Particulars)\b.*$"
+    ),
+    # Column header labels (individual tokens)
     re.compile(r"(?i)^(Transaction\s+ID|Txn\s+ID|Trans\s+ID|Txn\s+No|Transaction\s+No|ID)$"),
     re.compile(r"(?i)^(Date|Txn\s+Date|Transaction\s+Date|Posting\s+Date|Value\s+Date)$"),
     re.compile(r"(?i)^(Flow|Flow\s+Type|Transaction\s+Type|Dr\s*/\s*Cr)$"),
@@ -67,6 +77,8 @@ _HEADER_FOOTER_PATTERNS = [
 def is_header_or_footer(line: str) -> bool:
     """Return True if line matches a running header, page number, or table column header."""
     cleaned = line.strip()
+    if not cleaned:
+        return False
     return any(p.match(cleaned) for p in _HEADER_FOOTER_PATTERNS)
 
 
@@ -503,23 +515,34 @@ def parse_transactions(extraction: PDFDocumentExtraction) -> TransactionStatemen
         if not filtered_tokens:
             continue
 
-        if is_flow_layout(filtered_tokens):
-            txn, running_balance = parse_flow_row(filtered_tokens, running_balance)
-            transactions.append(txn)
-        else:
-            # Stage 2: trim trailing tokens that cannot be a valid amount or placeholder
-            while len(filtered_tokens) > 4:
-                last = filtered_tokens[-1].strip()
-                if last in _EMPTY_MARKERS:
-                    break
-                if is_valid_amount_str(last):
-                    break
-                logger.debug(f"Stripping trailing non-amount token from row: {last!r}")
-                filtered_tokens.pop()
+        try:
+            if is_flow_layout(filtered_tokens):
+                txn, running_balance = parse_flow_row(filtered_tokens, running_balance)
+                transactions.append(txn)
+            else:
+                # Stage 2: trim trailing tokens that cannot be a valid amount or placeholder
+                while len(filtered_tokens) > 4:
+                    last = filtered_tokens[-1].strip()
+                    if last in _EMPTY_MARKERS:
+                        break
+                    if is_valid_amount_str(last):
+                        break
+                    logger.debug(f"Stripping trailing non-amount token from row: {last!r}")
+                    filtered_tokens.pop()
 
-            txn = parse_row_tokens(filtered_tokens)
-            running_balance = txn.balance
-            transactions.append(txn)
+                txn = parse_row_tokens(filtered_tokens)
+                running_balance = txn.balance
+                transactions.append(txn)
+        except Exception as row_err:
+            logger.warning(
+                f"Skipping unparseable row {i + 1}/{len(starts)} ({filtered_tokens[:3]}...): {row_err}"
+            )
+            continue
+
+    if not transactions:
+        raise TransactionParsingError(
+            f"No valid transactions could be extracted from statement '{extraction.file_name}'."
+        )
 
     logger.info(
         f"Parsed {len(transactions)} validated transaction(s) from '{extraction.file_name}'"

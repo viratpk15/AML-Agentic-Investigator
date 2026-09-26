@@ -97,6 +97,22 @@ async def _run_async_investigation(
 
     # 2. Execute LangGraph in worker thread to prevent event-loop starvation
     try:
+        def _bus_callback(event: InvestigationEvent) -> None:
+            # If agent emits INVESTIGATION_COMPLETED, forward as SYNTHESIS_COMPLETED so the
+            # bus remains open until report generation and markdown formatting complete
+            if event.event_type == EventType.INVESTIGATION_COMPLETED:
+                bus.publish_sync(
+                    InvestigationEvent(
+                        investigation_id=event.investigation_id,
+                        event_type=EventType.SYNTHESIS_COMPLETED,
+                        node="investigator",
+                        message="Investigation reasoning concluded. Compiling final compliance report artifacts...",
+                        metadata=event.metadata,
+                    )
+                )
+            else:
+                bus.publish_sync(event)
+
         investigation_result = await asyncio.to_thread(
             run_investigation,
             statement=statement,
@@ -106,7 +122,7 @@ async def _run_async_investigation(
             include_profile=True,
             include_network=True,
             enable_critic=True,
-            event_callback=bus.publish_sync,
+            event_callback=_bus_callback,
             investigation_id=investigation_id,
         )
 
@@ -122,9 +138,35 @@ async def _run_async_investigation(
             logger.warning(
                 f"[Async Investigation {investigation_id}] Concluded with MAX_ITERATIONS_REACHED. Partial report: {report.report_id}"
             )
+            bus.publish_sync(
+                InvestigationEvent(
+                    investigation_id=investigation_id,
+                    event_type=EventType.INVESTIGATION_MAX_ITERATIONS,
+                    status="MAX_ITERATIONS_REACHED",
+                    message=f"Investigation concluded with partial findings (Report ID: {report.report_id}).",
+                    metadata={"report_id": report.report_id},
+                )
+            )
         else:
             bus.set_result(report=report, markdown=markdown_text)
             logger.info(f"[Async Investigation {investigation_id}] Successfully concluded. Report: {report.report_id}")
+            bus.publish_sync(
+                InvestigationEvent(
+                    investigation_id=investigation_id,
+                    event_type=EventType.REPORT_GENERATED,
+                    message=f"Compliance audit report generated (Report ID: {report.report_id}).",
+                    metadata={"report_id": report.report_id},
+                )
+            )
+            bus.publish_sync(
+                InvestigationEvent(
+                    investigation_id=investigation_id,
+                    event_type=EventType.INVESTIGATION_COMPLETED,
+                    status="COMPLETED",
+                    message=f"Investigation workflow concluded ({len(investigation_result.tools_used)} tools executed, {investigation_result.revision_count} revisions).",
+                    metadata={"report_id": report.report_id},
+                )
+            )
 
         # Persist to investigation history
         try:
@@ -405,6 +447,9 @@ async def _run_demo_async_investigation(
         report = generate_investigation_report(statement=statement, investigation=demo_inv)
         markdown_text = format_report_markdown(report)
 
+        # Set result on bus before emitting completion event so report is immediately readable
+        bus.set_result(report=report, markdown=markdown_text)
+
         # 13. Final Report & Completion
         bus.publish_sync(
             InvestigationEvent(
@@ -432,8 +477,6 @@ async def _run_demo_async_investigation(
             )
         except Exception as hist_err:
             logger.warning(f"Could not persist demo run to history: {hist_err}")
-
-        bus.set_result(report=report, markdown=markdown_text)
 
     except Exception as exc:
         logger.error(f"[Demo Async Investigation] Error: {exc}")
@@ -581,9 +624,12 @@ async def stream_investigation_events(investigation_id: str) -> StreamingRespons
         )
 
     async def event_generator() -> AsyncIterator[str]:
-        async for event in bus.subscribe():
-            payload = event.model_dump_json()
-            yield f"event: investigation_event\ndata: {payload}\n\n"
+        async for event in bus.subscribe(heartbeat_interval=10.0):
+            if event is None:
+                yield ": keepalive\n\n"
+            else:
+                payload = event.model_dump_json()
+                yield f"event: investigation_event\ndata: {payload}\n\n"
 
     return StreamingResponse(
         event_generator(),
