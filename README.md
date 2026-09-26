@@ -120,7 +120,7 @@ OPENROUTER_API_KEY=your_openrouter_api_key_here
 
 # Fallback LLM Provider 2 (NVIDIA NIM / build.nvidia.com)
 NVIDIA_API_KEY=your_nvidia_api_key_here
-NVIDIA_MODEL="meta/llama-3.3-70b-instruct"
+NVIDIA_MODEL="meta/llama-3.2-11b-vision-instruct"
 NVIDIA_BASE_URL="https://integrate.api.nvidia.com/v1"
 
 # Application Configuration

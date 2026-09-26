@@ -60,6 +60,7 @@ async def _run_async_investigation(
     filename: str,
     question: str,
     rag_service: Optional[RAGService],
+    settings: Optional[Settings] = None,
 ) -> None:
     """Asynchronous background worker executing PDF ingestion, LangGraph agent, and report generation."""
     event_manager = get_event_manager()
@@ -123,6 +124,7 @@ async def _run_async_investigation(
             else:
                 bus.publish_sync(event)
 
+        active_settings = settings or get_api_settings()
         investigation_result = await asyncio.to_thread(
             run_investigation,
             statement=statement,
@@ -134,6 +136,7 @@ async def _run_async_investigation(
             enable_critic=True,
             event_callback=_bus_callback,
             investigation_id=investigation_id,
+            settings=active_settings,
         )
 
         # 3. Generate structured report and Markdown
@@ -553,6 +556,7 @@ async def start_investigation(
     file: UploadFile = File(..., description="Customer bank statement in PDF format"),
     question: str = Form(..., description="Analyst guidance or question for investigation"),
     rag_service: Optional[RAGService] = Depends(get_api_rag_service),
+    settings: Settings = Depends(get_api_settings),
 ) -> InvestigationStartResponse:
     """Accept statement PDF and question, queue background investigation, and return immediately."""
     clean_question = (question or "").strip()
@@ -601,6 +605,7 @@ async def start_investigation(
         filename=filename,
         question=clean_question,
         rag_service=rag_service,
+        settings=settings,
     )
 
     return InvestigationStartResponse(

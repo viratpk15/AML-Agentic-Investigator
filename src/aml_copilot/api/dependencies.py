@@ -8,9 +8,9 @@ from aml_copilot.config import Settings, get_settings
 from aml_copilot.rag.service import RAGService, get_rag_service
 
 
-@lru_cache()
 def get_api_settings() -> Settings:
-    """Provide cached system settings."""
+    """Provide system settings refreshed from .env."""
+    get_settings.cache_clear()
     return get_settings()
 
 

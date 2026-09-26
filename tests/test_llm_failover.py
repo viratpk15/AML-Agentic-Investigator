@@ -87,7 +87,7 @@ def _openrouter_config(model: str = "qwen/qwen3.8-27b:free") -> ProviderConfig:
     return ProviderConfig(name="openrouter", model=model, api_key="sk-or-fake", max_context_tokens=12000, base_url="https://openrouter.ai/api/v1")
 
 
-def _nvidia_config(model: str = "meta/llama-3.3-70b-instruct") -> ProviderConfig:
+def _nvidia_config(model: str = "meta/llama-3.2-11b-vision-instruct") -> ProviderConfig:
     return ProviderConfig(name="nvidia", model=model, api_key="nvapi-fake", max_context_tokens=12000, base_url="https://integrate.api.nvidia.com/v1")
 
 
@@ -234,7 +234,7 @@ class TestLLMFactory:
             openrouter_base_url="https://openrouter.ai/api/v1",
             openrouter_max_context_tokens=12000,
             nvidia_api_key="nvapi-fake",
-            nvidia_model="meta/llama-3.3-70b-instruct",
+            nvidia_model="meta/llama-3.2-11b-vision-instruct",
             nvidia_base_url="https://integrate.api.nvidia.com/v1",
             nvidia_max_context_tokens=12000,
             llm_temperature=0.0,
@@ -274,7 +274,7 @@ class TestLLMFactory:
         factory = LLMFactory(settings=s)
         cfg = factory.primary_config()
         assert cfg.name == "nvidia"
-        assert cfg.model == "meta/llama-3.3-70b-instruct"
+        assert cfg.model == "meta/llama-3.2-11b-vision-instruct"
         assert cfg.has_credentials()
         assert cfg.base_url == "https://integrate.api.nvidia.com/v1"
 
@@ -322,7 +322,7 @@ class TestLLMFactory:
     def test_build_nvidia_missing_key_raises(self):
         from aml_copilot.exceptions import AgentConfigurationError
         from aml_copilot.llm.factory import build_chat_model
-        cfg = ProviderConfig(name="nvidia", model="meta/llama-3.3-70b-instruct", api_key=None)
+        cfg = ProviderConfig(name="nvidia", model="meta/llama-3.2-11b-vision-instruct", api_key=None)
         with pytest.raises(AgentConfigurationError, match="NVIDIA API key not configured"):
             build_chat_model(cfg)
 

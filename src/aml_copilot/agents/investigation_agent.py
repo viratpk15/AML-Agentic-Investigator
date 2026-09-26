@@ -373,6 +373,7 @@ def run_investigation(
     critic_llm: Optional[BaseChatModel] = None,
     event_callback: Optional[Any] = None,
     investigation_id: Optional[str] = None,
+    settings: Optional[Settings] = None,
 ) -> InvestigationResult:
     """Convenience helper to initialize an investigation agent and run a query."""
     agent = InvestigationAgent(
@@ -385,6 +386,7 @@ def run_investigation(
         enable_critic=enable_critic,
         max_revisions=max_revisions,
         critic_llm=critic_llm,
+        settings=settings,
     )
     return agent.investigate(
         statement=statement,

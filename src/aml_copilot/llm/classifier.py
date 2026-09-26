@@ -19,6 +19,7 @@ logger = get_logger(__name__)
 # ---------------------------------------------------------------------------
 _RETRYABLE_STATUS_CODES = {
     404,   # Not Found — model deprecated/missing on this provider; try next provider
+    410,   # Gone — model reached end of life / deprecated on this provider
     413,   # Request Entity Too Large / request too large
     429,   # Too Many Requests / rate limit / quota
     500,   # Internal Server Error (transient)
@@ -60,6 +61,9 @@ _RETRYABLE_PATTERNS = [
     r"retry",
     r"not_found",
     r"NOT_FOUND",
+    r"end\s+of\s+life",
+    r"no\s+longer\s+available",
+    r"not\s+found\s+for\s+account",
 ]
 
 _AUTH_PATTERNS = [
@@ -179,6 +183,7 @@ def classify_provider_error(
 def _reason_from_status(status_code: int) -> str:
     return {
         404: "model_not_found",
+        410: "model_deprecated",
         413: "request_too_large",
         429: "rate_limit_exceeded",
         500: "server_error",

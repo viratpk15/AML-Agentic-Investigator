@@ -22,7 +22,7 @@ _DEFAULTS: dict[str, str] = {
     "groq": "openai/gpt-oss-120b",
     "gemini": "gemini-3.8-flash",
     "openrouter": "inclusionai/ling-3.0-flash-fin:free",
-    "nvidia": "meta/llama-3.3-70b-instruct",
+    "nvidia": "meta/llama-3.2-11b-vision-instruct",
     "openai": "gpt-4o-mini",
 }
 
