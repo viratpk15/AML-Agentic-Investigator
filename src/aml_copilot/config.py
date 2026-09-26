@@ -80,6 +80,21 @@ class Settings(BaseSettings):
 
 
 @lru_cache
-def get_settings() -> Settings:
-    """Return a cached instance of application settings."""
+def _get_cached_settings() -> Settings:
     return Settings()
+
+
+def get_settings() -> Settings:
+    """Return an application settings instance refreshed from .env."""
+    from pathlib import Path
+    env_file = Path(".env")
+    if env_file.exists():
+        try:
+            import dotenv
+            dotenv.load_dotenv(dotenv_path=env_file, override=True)
+        except Exception:
+            pass
+    return _get_cached_settings()
+
+
+get_settings.cache_clear = _get_cached_settings.cache_clear  # type: ignore[attr-defined]

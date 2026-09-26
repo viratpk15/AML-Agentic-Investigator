@@ -9,7 +9,14 @@ from aml_copilot.rag.service import RAGService, get_rag_service
 
 
 def get_api_settings() -> Settings:
-    """Provide system settings refreshed from .env."""
+    """Provide system settings refreshed dynamically from .env."""
+    env_file = Path(".env")
+    if env_file.exists():
+        try:
+            import dotenv
+            dotenv.load_dotenv(dotenv_path=env_file, override=True)
+        except Exception:
+            pass
     get_settings.cache_clear()
     return get_settings()
 
