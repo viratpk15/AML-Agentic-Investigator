@@ -1,5 +1,6 @@
 """FastAPI application factory for the AML Investigation Copilot API."""
 
+import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -20,10 +21,19 @@ def create_app() -> FastAPI:
         redoc_url="/redoc",
     )
 
-    # Enable CORS for local Next.js frontend and external development clients
+    # Enable CORS for local Next.js frontend, Vercel deployments, and external clients
+    origins = [
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+    ]
+    env_origins = os.getenv("CORS_ORIGINS", "")
+    if env_origins:
+        origins.extend([o.strip() for o in env_origins.split(",") if o.strip()])
+
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],
+        allow_origins=origins if origins else ["*"],
+        allow_origin_regex=r"https://.*\.vercel\.app",
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
