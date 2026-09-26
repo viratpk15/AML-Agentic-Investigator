@@ -449,6 +449,30 @@ class TestFailoverLLM:
             flm._generate([HumanMessage(content="test")])
         gemini_mock.invoke.assert_not_called()
 
+    def test_fallback_auth_error_cascades_to_subsequent_fallback(self):
+        """When a secondary fallback fails authentication, failover must cascade to the next fallback."""
+        exc1 = Exception("429 TPM limit exceeded")
+        exc1.status_code = 429  # type: ignore[attr-defined]
+        exc2 = Exception("401 Unauthorized: User not found")
+        exc2.status_code = 401  # type: ignore[attr-defined]
+
+        groq_mock = _failing_llm(exc1)
+        openrouter_mock = _failing_llm(exc2)
+        nvidia_mock = _fake_llm("nvidia recovered")
+
+        flm = _make_failover(
+            [
+                (_groq_config(), groq_mock),
+                (_openrouter_config(), openrouter_mock),
+                (_nvidia_config(), nvidia_mock),
+            ],
+        )
+        result = flm._generate([HumanMessage(content="test")])
+        assert result.generations[0].message.content == "nvidia recovered"
+        groq_mock.invoke.assert_called_once()
+        openrouter_mock.invoke.assert_called_once()
+        nvidia_mock.invoke.assert_called_once()
+
     def test_all_providers_fail_raises_exhausted(self):
         exc = Exception("TPM limit exceeded")
         exc.status_code = 429  # type: ignore[attr-defined]

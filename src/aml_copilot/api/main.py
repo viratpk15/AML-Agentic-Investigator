@@ -28,12 +28,15 @@ def create_app() -> FastAPI:
     ]
     env_origins = os.getenv("CORS_ORIGINS", "")
     if env_origins:
-        origins.extend([o.strip() for o in env_origins.split(",") if o.strip()])
+        if env_origins.strip() == "*":
+            origins = ["*"]
+        else:
+            origins.extend([o.strip() for o in env_origins.split(",") if o.strip()])
 
     app.add_middleware(
         CORSMiddleware,
         allow_origins=origins if origins else ["*"],
-        allow_origin_regex=r"https://.*\.vercel\.app",
+        allow_origin_regex=r"https://.*(\.vercel\.app|\.onrender\.com)",
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],

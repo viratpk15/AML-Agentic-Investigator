@@ -201,7 +201,6 @@ class FailoverLLM(BaseChatModel):
                 classified = classify_provider_error(raw_exc, provider=provider_name)
 
                 if isinstance(classified, ProviderAuthError):
-                    # Auth errors must NOT trigger fallback — it's a config problem.
                     logger.error(
                         f"[FailoverLLM] Non-retryable auth error from '{provider_name}': {classified}"
                     )
@@ -209,13 +208,36 @@ class FailoverLLM(BaseChatModel):
                         self.event_callback,
                         self.investigation_id,
                         "LLM_PROVIDER_FAILED",
-                        f"Provider {provider_name.upper()} returned a non-retryable authentication error.",
+                        f"Provider {provider_name.upper()} returned an authentication error ({classified.status_code}).",
                         {
                             "provider": provider_name,
                             "reason": "auth_error",
                             "status_code": classified.status_code,
                         },
                     )
+                    # Auth error on the primary provider must fail fast to alert operator of misconfiguration.
+                    # Auth error on a secondary fallback cascades to any remaining fallbacks.
+                    if is_primary:
+                        raise classified from raw_exc
+
+                    causes.append(classified)
+                    next_idx = idx + 1
+                    if next_idx < len(self.providers):
+                        next_cfg: ProviderConfig = self.providers[next_idx][0]
+                        _emit_provider_event(
+                            self.event_callback,
+                            self.investigation_id,
+                            "LLM_PROVIDER_FALLBACK",
+                            f"Fallback provider {provider_name.upper()} auth failed. Cascading to next fallback: {next_cfg.name.upper()} / {next_cfg.model}",
+                            {
+                                "primary_provider": self.providers[0][0].name,
+                                "failed_provider": provider_name,
+                                "fallback_provider": next_cfg.name,
+                                "reason": "auth_error",
+                                "status_code": classified.status_code,
+                            },
+                        )
+                        continue
                     raise classified from raw_exc
 
                 # Retryable error — log, emit telemetry, try next provider
