@@ -688,6 +688,17 @@ async def get_investigation_status(investigation_id: str) -> InvestigationStatus
     event_manager = get_event_manager()
     bus = event_manager.get_bus(investigation_id)
     if not bus:
+        hist_data = get_history_service().get_run_by_investigation_id(investigation_id)
+        if hist_data:
+            return InvestigationStatusResponse(
+                investigation_id=investigation_id,
+                status=hist_data.get("status", "COMPLETED"),
+                latest_event=None,
+                report=hist_data.get("report"),
+                markdown=hist_data.get("markdown"),
+                execution_time_seconds=hist_data.get("runtime_seconds"),
+                error=None,
+            )
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Investigation with ID '{investigation_id}' does not exist.",

@@ -133,6 +133,18 @@ class InvestigationHistoryService:
             logger.error(f"Failed to load history report {report_id}: {exc}")
             return None
 
+    def get_run_by_investigation_id(self, investigation_id: str) -> Optional[Dict[str, Any]]:
+        """Retrieve historical report and metadata by investigation ID."""
+        records = self.list_history()
+        match = next((r for r in records if r.investigation_id == investigation_id), None)
+        if match:
+            data = self.get_report(match.report_id)
+            if data:
+                data["status"] = match.status
+                data["runtime_seconds"] = match.runtime_seconds
+                return data
+        return None
+
 
 _history_service_instance: Optional[InvestigationHistoryService] = None
 

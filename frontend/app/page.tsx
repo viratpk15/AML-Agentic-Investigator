@@ -278,13 +278,22 @@ export default function Home() {
       };
 
       // Polling fallback
+      let demoPollErrors = 0;
       pollTimerRef.current = setInterval(async () => {
         if (isFinished) return;
         try {
           const statusData = await getInvestigation(invId);
+          demoPollErrors = 0;
           if (statusData.report) finishDemo(statusData);
         } catch {
-          // ignore
+          demoPollErrors++;
+          if (demoPollErrors >= 3) {
+            if (pollTimerRef.current) {
+              clearInterval(pollTimerRef.current);
+              pollTimerRef.current = null;
+            }
+            setIsLoading(false);
+          }
         }
       }, 1000);
 
@@ -403,15 +412,26 @@ export default function Home() {
       };
 
       // 1. Rock-solid polling fallback every 1.5s
+      let pollErrors = 0;
       pollTimerRef.current = setInterval(async () => {
         if (isFinished) return;
         try {
           const statusData = await getInvestigation(invId);
+          pollErrors = 0;
           if (statusData.report || statusData.status === "FAILED" || statusData.error) {
             finishInvestigation(statusData);
           }
         } catch (pollErr: any) {
+          pollErrors++;
           console.warn("[Poll status check]", pollErr);
+          if (pollErrors >= 3) {
+            if (pollTimerRef.current) {
+              clearInterval(pollTimerRef.current);
+              pollTimerRef.current = null;
+            }
+            setIsLoading(false);
+            addLog("System", `Investigation ${invId} is no longer active on server. Polling stopped.`, "warning");
+          }
         }
       }, 1500);
 
