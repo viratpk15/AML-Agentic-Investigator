@@ -200,7 +200,7 @@ def _build_demo_investigation_result(question: str) -> InvestigationResult:
         "Observed Evidence:\n"
         "During October 2026, 54 transactions were processed for customer Arjun Malhotra (Account XX6384). "
         "Key transactions of interest include TXN445 (a ₹575,000 credit from WESTBROOK MATERIALS on 2026-10-20), "
-        "followed closely by outgoing disbursements including TXN434 (a ₹495,000 debit to APEX LOGISTICS).\n\n"
+        "followed closely by outgoing disbursements including TXN446 (a ₹255,000 debit to LUMEN CONSULTING on 2026-10-20).\n\n"
         "Analytical Findings:\n"
         "Deterministic screening triggered the configured monitoring threshold for large transactions (RULE_LARGE_TRANSACTION), "
         "rapid movement of funds (RULE_RAPID_MOVEMENT_OF_FUNDS), and high transaction velocity bursts. "

@@ -12,6 +12,7 @@ from aml_copilot.models.evidence import (
     SIGNAL_DOMAINS,
     CanonicalEvidence,
     build_canonical_evidence,
+    reconcile_customer_profile,
 )
 from aml_copilot.models.findings import DetectionResult
 from aml_copilot.models.transaction import Transaction, TransactionStatement
@@ -21,17 +22,27 @@ from aml_copilot.profiling.customer_profile import CustomerProfile
 from aml_copilot.profiling.profiler import build_customer_profile
 from aml_copilot.reporting.models import (
     AnomalyFindingItem,
+    AnomalyFindingsSummary,
     CriticSummary,
     CustomerProfileSummary,
+    CustomerSummary,
     DetectionFindingItem,
     EvidenceConvergenceItem,
+    EvidenceConvergenceSummary,
     EvidenceItem,
+    HumanReviewQueueSummary,
+    InterpretationContext,
     InvestigationReport,
     KnowledgeReferenceItem,
     NetworkFindingItem,
     NetworkSummary,
+    RAGSummary,
+    ReportDTO,
+    ReportMetadata,
     RevisionSummary,
+    RuleFindingsSummary,
     RuleSummaryGroup,
+    TransactionSummary,
 )
 from aml_copilot.reporting.validation import validate_report_evidence
 
@@ -53,7 +64,11 @@ def align_narrative_with_canonical_evidence(
         return ""
 
     actual_anom_ids = canonical_evidence.anomaly_transaction_ids if canonical_evidence else []
-    total_txns = (canonical_evidence.total_transactions if canonical_evidence else 0) or 54
+    total_txns = (
+        canonical_evidence.total_transactions
+        if canonical_evidence and canonical_evidence.total_transactions
+        else (len(canonical_evidence.canonical_transactions) if canonical_evidence else 0)
+    )
     hr_items = canonical_evidence.human_review_items if canonical_evidence else []
     hr_count = len(hr_items)
 
@@ -168,6 +183,12 @@ def generate_investigation_report(
             network_result=network_result,
             knowledge_sources=investigation.knowledge_sources,
         )
+
+    # 1b. Enforce strict mathematical reconciliation invariants on Customer Profile
+    reconcile_customer_profile(
+        canonical_evidence.customer_profile,
+        canonical_evidence.canonical_transactions,
+    )
 
     stmt_txns: Dict[str, Transaction] = {t.transaction_id: t for t in statement.transactions if t.transaction_id}
 
@@ -553,16 +574,110 @@ def generate_investigation_report(
             "They do not establish legal guilt, fraud, or regulatory violations."
         )
 
-    # 13. Section 12: Recommended Next Steps
+    # 13. Section 12: Recommended Next Steps (Grounded in investigation evidence)
+    dominant_cps = canonical_evidence.network_dominant_counterparties or []
+    if dominant_cps:
+        cp_clause = f" for high-volume counterparties including {', '.join(dominant_cps[:3])}."
+    else:
+        cp_clause = " for identified high-volume counterparties."
+
     next_steps = [
         "Conduct Enhanced Customer Due Diligence (EDD) to verify the declared commercial profile and purpose of the account.",
-        "Review transactional source documents (invoices, commercial agreements, transport receipts) for high-volume counterparties including LUMEN CONSULTING, NORTHGATE COMPONENTS, and WESTBROOK MATERIALS.",
+        f"Review transactional source documents (invoices, commercial agreements, transport receipts){cp_clause}",
         "Cross-reference rapid pass-through sequences with public corporate registry databases to verify counterparty corporate status and beneficial ownership.",
         "Compare observed velocity and volume surges against baseline account expectations documented at onboarding.",
         "Escalate multi-signal convergence review items to Senior Compliance Management in accordance with institutional SAR/STR reporting procedures where warranted.",
     ]
 
-    # Assemble base report with all 14 canonical sections
+    # Compute actual critic validation counts
+    critic_summary.factual_claim_count = len(all_evidence_ids) + len(critic_summary.issues) + len(critic_summary.unsupported_claims)
+    critic_summary.validation_error_count = len(critic_summary.issues) + len(critic_summary.unsupported_claims) + len(critic_summary.safety_violations)
+
+    # 14. Construct Canonical ReportDTO
+    report_metadata = ReportMetadata(
+        report_id=report_id,
+        generated_at=now_utc,
+        investigation_question=investigation.question,
+        status="PARTIAL" if is_partial_max_iter else "COMPLETED",
+        source_type="universal_canonical",
+    )
+    customer_summary = CustomerSummary(
+        customer_name=statement.customer_name or "Unknown Customer",
+        account_number=statement.account_number or "Unknown Account",
+        statement_period=statement.statement_period or "Unknown Period",
+    )
+    high_value_txns = canonical_evidence.high_value_transactions(threshold=200000.0)
+    tx_summary = TransactionSummary(
+        total_transactions=statement.total_transactions,
+        total_credits=round(sum(t.amount for t in canonical_evidence.canonical_transactions if t.direction == "credit"), 2),
+        total_debits=round(sum(t.amount for t in canonical_evidence.canonical_transactions if t.direction == "debit"), 2),
+        net_flow=round(
+            sum(t.amount for t in canonical_evidence.canonical_transactions if t.direction == "credit") -
+            sum(t.amount for t in canonical_evidence.canonical_transactions if t.direction == "debit"),
+            2,
+        ),
+        currency="INR",
+        canonical_transactions=canonical_evidence.canonical_transactions,
+        high_value_transactions=high_value_txns,
+        observed_evidence=observed_evidence,
+    )
+    rules_summary = RuleFindingsSummary(
+        total_rule_signals=len(canonical_evidence.rule_findings),
+        rule_summary_groups=rule_summary_groups,
+        detection_findings=detection_findings,
+    )
+    anomalies_summary = AnomalyFindingsSummary(
+        total_anomalies=len(canonical_evidence.statistical_anomalies),
+        anomaly_transaction_ids=canonical_evidence.anomaly_transaction_ids,
+        anomaly_findings=anomaly_findings,
+        model="isolation_forest",
+        provenance="isolation_forest",
+    )
+    rag_summary = RAGSummary(
+        retrieved_references=aml_reference_context,
+        reference_disclaimer=(
+            "No AML reference guidance was retrieved during this investigation."
+            if not aml_reference_context
+            else "Retrieved from AML reference knowledge base for educational/analytical context."
+        ),
+    )
+    convergence_summary = EvidenceConvergenceSummary(
+        converged_items=evidence_convergence,
+    )
+    hr_queue_summary = HumanReviewQueueSummary(
+        total_analyzed=statement.total_transactions,
+        prioritized_review_count=len(hr_items),
+        high_priority_count=high_count,
+        medium_priority_count=med_count,
+        low_priority_count=low_count,
+        items=canonical_evidence.human_review_items,
+    )
+    interp_context = InterpretationContext(
+        narrative=interpretation,
+        executive_summary=exec_summary,
+        executive_summary_bullets=exec_summary_bullets,
+    )
+
+    report_dto = ReportDTO(
+        metadata=report_metadata,
+        customer=customer_summary,
+        transactions=tx_summary,
+        rules=rules_summary,
+        anomalies=anomalies_summary,
+        profile=customer_profile_summary,
+        network=network_summary,
+        network_findings=network_findings,
+        rag=rag_summary,
+        convergence=convergence_summary,
+        human_review=hr_queue_summary,
+        interpretation=interp_context,
+        critic=critic_summary,
+        revision=revision_summary,
+        limitations=limitations,
+        recommendations=next_steps,
+    )
+
+    # Assemble base report with all 14 canonical sections and attach ReportDTO
     report = InvestigationReport(
         report_id=report_id,
         generated_at=now_utc,
@@ -590,6 +705,7 @@ def generate_investigation_report(
         critic_validation=critic_summary,
         revision_history=revision_summary,
         evidence_validation_passed=True,
+        report_dto=report_dto,
     )
 
     # 14. Rigorous Evidence Provenance Validation (Step 5)

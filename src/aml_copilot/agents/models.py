@@ -109,3 +109,9 @@ class CritiqueResult(BaseModel):
     unverified_transaction_reference_count: int = Field(
         default=0, description="Count of cited transaction references that do not exist in statement"
     )
+    factual_claim_count: int = Field(
+        default=0, description="Total factual claims and transaction references audited"
+    )
+    validation_error_count: int = Field(
+        default=0, description="Total validation issues, unsupported claims, and safety flags"
+    )

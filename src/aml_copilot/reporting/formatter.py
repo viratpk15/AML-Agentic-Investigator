@@ -1,8 +1,24 @@
-"""Formatting functions for serializing InvestigationReport into Markdown and JSON."""
-
 import json
+import re
 from typing import Any, Dict, List
 from aml_copilot.reporting.models import InvestigationReport
+
+
+def _clean_narrative_text(text: str) -> str:
+    """Remove duplicate report titles or nested report markdown headers from narrative text."""
+    if not text:
+        return ""
+    # Remove nested title if present
+    cleaned = re.sub(r"(?im)^#\s+AML\s+Investigation\s+Report\s*$", "", text)
+    # Remove nested section headers if LLM attempted to write its own report
+    cleaned = re.sub(
+        r"(?im)^##\s+\d*\.?\s*(?:Investigation\s+Overview|Executive\s+Summary|Observed\s+Transaction\s+Evidence|Transaction\s+Summary|Detection\s+Findings|Rule\s+Findings|Statistical\s+Anomalies|Customer\s+Profile|Network\s+Analysis|AML\s+Knowledge\s+Context|AML\s+Reference\s+Context|Evidence\s+Convergence|Human\s+Review\s+Queue|Interpretation|Limitations|Recommended\s+Next\s+Steps|Recommendations|Critic\s+Validation|Human\s+Review)\s*$",
+        "",
+        cleaned,
+    )
+    # Strip excessive blank lines
+    cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
+    return cleaned.strip()
 
 
 def format_report_markdown(report: InvestigationReport) -> str:
@@ -46,9 +62,9 @@ def format_report_markdown(report: InvestigationReport) -> str:
     lines.append("")
     if report.executive_summary_bullets:
         for b in report.executive_summary_bullets:
-            lines.append(f"- {b}")
+            lines.append(f"- {_clean_narrative_text(b)}")
     else:
-        lines.append(report.executive_summary)
+        lines.append(_clean_narrative_text(report.executive_summary))
     lines.append("")
 
     # 3. Observed Transaction Evidence
@@ -67,6 +83,19 @@ def format_report_markdown(report: InvestigationReport) -> str:
     else:
         lines.append("*No specific transaction IDs were directly cited in the statement.*")
     lines.append("")
+
+    # High-Value Transactions under configured monitoring threshold
+    if report.report_dto and report.report_dto.transactions.high_value_transactions:
+        high_val = report.report_dto.transactions.high_value_transactions
+        lines.append("### High-Value Transactions (Configured Monitoring Threshold)")
+        lines.append("")
+        lines.append("Transactions meeting or exceeding the configured monitoring threshold (₹200,000.00):")
+        lines.append("")
+        lines.append("| Transaction ID | Date | Flow | Amount (INR) | Counterparty |")
+        lines.append("| :--- | :--- | :--- | :--- | :--- |")
+        for ht in high_val:
+            lines.append(f"| `{ht.transaction_id}` | {ht.date or 'N/A'} | {ht.direction.upper()} | ₹{ht.amount:,.2f} | {ht.counterparty or 'Unspecified'} |")
+        lines.append("")
 
     # 4. Detection Findings
     lines.append("## 4. Detection Findings")
@@ -221,7 +250,7 @@ def format_report_markdown(report: InvestigationReport) -> str:
     # 10. Interpretation
     lines.append("## 10. Interpretation")
     lines.append("")
-    lines.append(report.interpretation or report.executive_summary)
+    lines.append(_clean_narrative_text(report.interpretation or report.executive_summary))
     lines.append("")
 
     # 11. Limitations
@@ -266,7 +295,16 @@ def format_report_markdown(report: InvestigationReport) -> str:
         for sv in cv.safety_violations:
             lines.append(f"  - {sv}")
     if cv.passed and not cv.issues:
-        lines.append("- **Factual Grounding**: All referenced transactions, dates, amounts, and flow directions match verified statement records. No unverified legal accusations detected.")
+        if cv.verified_transaction_reference_count > 0:
+            lines.append(
+                f"- **Factual Grounding**: All {cv.verified_transaction_reference_count} referenced transactions, "
+                "dates, amounts, and flow directions match verified statement records. No unverified legal accusations detected."
+            )
+        else:
+            lines.append(
+                "- **Factual Grounding**: No narrative transaction references required verification; "
+                "statement records and safety guardrails audited with zero discrepancies."
+            )
     lines.append("")
 
     rh = report.revision_history

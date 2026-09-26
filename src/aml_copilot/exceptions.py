@@ -32,3 +32,11 @@ class ToolExecutionError(AMLCopilotError):
 class AgentConfigurationError(AMLCopilotError):
     """Raised when the investigation agent is misconfigured or lacks required LLM credentials."""
 
+
+class ReportReconciliationError(AMLCopilotError):
+    """Raised when customer profile or report statistics fail mathematical reconciliation invariants."""
+
+
+class ReportEvidenceValidationError(AMLCopilotError):
+    """Raised when report evidence fails deterministic provenance validation against canonical evidence."""
+

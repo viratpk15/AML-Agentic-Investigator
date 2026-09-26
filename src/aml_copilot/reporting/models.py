@@ -3,6 +3,8 @@
 from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, Field
 
+from aml_copilot.models.evidence import CanonicalTransaction, HumanReviewItem
+
 
 class EvidenceItem(BaseModel):
     """Factual transaction evidence verified directly against the customer statement."""
@@ -65,6 +67,21 @@ class CustomerProfileSummary(BaseModel):
     indicators: List[str] = Field(
         default_factory=list, description="Observed behavioral indicator descriptions"
     )
+
+    @property
+    def net_flow(self) -> float:
+        """Alias for net_cash_flow."""
+        return self.net_cash_flow
+
+    @property
+    def peak_credit(self) -> Optional[float]:
+        """Alias for largest_credit_amount."""
+        return self.largest_credit_amount
+
+    @property
+    def peak_debit(self) -> Optional[float]:
+        """Alias for largest_debit_amount."""
+        return self.largest_debit_amount
 
 
 class NetworkFindingItem(BaseModel):
@@ -191,6 +208,12 @@ class CriticSummary(BaseModel):
     required_revisions: List[str] = Field(
         default_factory=list, description="Actionable revision instructions issued to Investigator"
     )
+    factual_claim_count: int = Field(
+        default=0, description="Total factual claims and transaction references audited"
+    )
+    validation_error_count: int = Field(
+        default=0, description="Total validation issues, unsupported claims, and safety flags"
+    )
 
 
 class RevisionSummary(BaseModel):
@@ -304,4 +327,161 @@ class InvestigationReport(BaseModel):
         default=True,
         description="Whether report passed deterministic provenance validation against canonical evidence",
     )
+    report_dto: Optional["ReportDTO"] = Field(
+        default=None,
+        description="Underlying canonical ReportDTO containing deterministic facts and provenance",
+    )
+
+    def to_markdown(self) -> str:
+        """Render the investigation report into canonical markdown representation."""
+        from aml_copilot.reporting.formatter import format_report_markdown
+
+        return format_report_markdown(self)
+
+
+# ---------------------------------------------------------------------------
+# Canonical Report DTO & Fact Structures
+# ---------------------------------------------------------------------------
+
+class ReportMetadata(BaseModel):
+    """Metadata detailing report identification, generation timestamp, and scope."""
+
+    report_id: str = Field(..., description="Unique report identifier")
+    generated_at: str = Field(..., description="ISO 8601 UTC timestamp of report generation")
+    investigation_question: str = Field(..., description="Investigation query or objective")
+    status: str = Field(default="COMPLETED", description="Investigation completion status")
+    source_type: str = Field(default="universal_canonical", description="Source ingestion classification")
+
+
+class CustomerSummary(BaseModel):
+    """Deterministic identification of the customer and account under investigation."""
+
+    customer_name: str = Field(default="Unknown Customer", description="Account holder name")
+    account_number: str = Field(default="Unknown Account", description="Account identifier")
+    statement_period: str = Field(default="Unknown Period", description="Analyzed statement period")
+
+
+class TransactionSummary(BaseModel):
+    """Deterministic transaction metrics and canonical records."""
+
+    total_transactions: int = Field(default=0, description="Total count of transactions analyzed")
+    total_credits: float = Field(default=0.0, description="Sum of incoming credit transactions")
+    total_debits: float = Field(default=0.0, description="Sum of outgoing debit transactions")
+    net_flow: float = Field(default=0.0, description="Net difference between credits and debits")
+    currency: str = Field(default="INR", description="Currency symbol or ISO code")
+    canonical_transactions: List[CanonicalTransaction] = Field(
+        default_factory=list, description="All canonical transaction objects"
+    )
+    high_value_transactions: List[CanonicalTransaction] = Field(
+        default_factory=list, description="Transactions meeting configured monitoring threshold"
+    )
+    observed_evidence: List[EvidenceItem] = Field(
+        default_factory=list, description="Verified factual transactions cited in investigation"
+    )
+
+
+class RuleFindingsSummary(BaseModel):
+    """Deterministic AML rule screening results."""
+
+    total_rule_signals: int = Field(default=0, description="Total rule signals triggered")
+    rule_summary_groups: List[RuleSummaryGroup] = Field(
+        default_factory=list, description="Grouped rule findings"
+    )
+    detection_findings: List[DetectionFindingItem] = Field(
+        default_factory=list, description="Individual rule trigger items"
+    )
+
+
+class AnomalyFindingsSummary(BaseModel):
+    """Deterministic statistical anomaly findings from Isolation Forest."""
+
+    total_anomalies: int = Field(default=0, description="Total statistical outliers identified")
+    anomaly_transaction_ids: List[str] = Field(
+        default_factory=list, description="Exact transaction IDs flagged by Isolation Forest"
+    )
+    anomaly_findings: List[AnomalyFindingItem] = Field(
+        default_factory=list, description="Detailed anomaly records with feature context"
+    )
+    model: str = Field(default="isolation_forest", description="Anomaly model name")
+    provenance: str = Field(default="isolation_forest", description="Source provenance")
+
+
+# Alias ProfileSummary to CustomerProfileSummary for universal naming
+ProfileSummary = CustomerProfileSummary
+
+
+class RAGSummary(BaseModel):
+    """AML reference guidance retrieved during investigation."""
+
+    retrieved_references: List[KnowledgeReferenceItem] = Field(
+        default_factory=list, description="Retrieved typology or guidance excerpts"
+    )
+    reference_disclaimer: str = Field(
+        default="No AML reference guidance was retrieved during this investigation.",
+        description="Disclaimer when no external guidance is retrieved",
+    )
+
+
+class EvidenceConvergenceSummary(BaseModel):
+    """Prioritized review items demonstrating multi-signal convergence."""
+
+    converged_items: List[EvidenceConvergenceItem] = Field(
+        default_factory=list, description="Items exhibiting multi-domain signal corroboration"
+    )
+
+
+class HumanReviewQueueSummary(BaseModel):
+    """Deterministic human review queue breakdown and prioritized items."""
+
+    total_analyzed: int = Field(default=0, description="Total transactions screened")
+    prioritized_review_count: int = Field(default=0, description="Total items in review queue")
+    high_priority_count: int = Field(default=0, description="Count of HIGH priority items")
+    medium_priority_count: int = Field(default=0, description="Count of MEDIUM priority items")
+    low_priority_count: int = Field(default=0, description="Count of LOW priority items")
+    items: List[HumanReviewItem] = Field(
+        default_factory=list, description="Deterministic prioritized human review items"
+    )
+
+
+class InterpretationContext(BaseModel):
+    """Bounded contextual interpretation explaining observed patterns."""
+
+    narrative: str = Field(default="", description="Bounded objective interpretation")
+    executive_summary: str = Field(default="", description="High-level factual synthesis")
+    executive_summary_bullets: List[str] = Field(
+        default_factory=list, description="Factual executive summary bullet points"
+    )
+
+
+class ReportDTO(BaseModel):
+    """Single canonical Report DTO / Report Facts structure containing all factual report data."""
+
+    metadata: ReportMetadata
+    customer: CustomerSummary
+    transactions: TransactionSummary
+    rules: RuleFindingsSummary
+    anomalies: AnomalyFindingsSummary
+    profile: Optional[ProfileSummary] = None
+    network: Optional[NetworkSummary] = None
+    network_findings: List[NetworkFindingItem] = Field(default_factory=list)
+    rag: RAGSummary
+    convergence: EvidenceConvergenceSummary
+    human_review: HumanReviewQueueSummary
+    interpretation: InterpretationContext
+    critic: CriticSummary
+    revision: RevisionSummary
+    limitations: List[str] = Field(default_factory=list)
+    recommendations: List[str] = Field(default_factory=list)
+    human_review_recommendation: str = Field(
+        default=(
+            "This investigation report is an automated analytical aid for compliance analysis. "
+            "Final determinations regarding regulatory reporting, customer due diligence, and account "
+            "status remain the exclusive responsibility of qualified human compliance officers."
+        )
+    )
+
+
+InvestigationReport.model_rebuild()
+
+
 

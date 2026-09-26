@@ -2,8 +2,8 @@
 
 ## 1. Investigation Overview
 
-- **Report ID**: `REP-AML-20260925-2F0C83`
-- **Generated Time**: `2026-09-25T16:15:28.535420+00:00`
+- **Report ID**: `REP-AML-20260926-7BE8A9`
+- **Generated Time**: `2026-09-26T09:35:00.639227+00:00`
 - **Customer / Account**: Arjun Malhotra (Account: `XX6384`)
 - **Analysis Period**: 01 Sep 2026 – 28 Oct 2026
 - **Investigation Question**: Investigate unusual movement of funds in this account and highlight transactions requiring human review.
@@ -76,6 +76,29 @@
 | `TXN452` | 2026-10-25 | DEBIT | ₹218,000.00 | LUMEN CONSULTING | ✓ Verified in Statement |
 | `TXN453` | 2026-10-26 | DEBIT | ₹150,000.00 | RIVERBEND SUPPLIERS | ✓ Verified in Statement |
 | `TXN454` | 2026-10-28 | DEBIT | ₹15,000.00 | FAMILY TRANSFER | ✓ Verified in Statement |
+
+### High-Value Transactions (Configured Monitoring Threshold)
+
+Transactions meeting or exceeding the configured monitoring threshold (₹200,000.00):
+
+| Transaction ID | Date | Flow | Amount (INR) | Counterparty |
+| :--- | :--- | :--- | :--- | :--- |
+| `TXN405` | 2026-09-06 | CREDIT | ₹285,000.00 | OAKRIDGE EXPORTS |
+| `TXN407` | 2026-09-09 | CREDIT | ₹318,000.00 | CRESTLINE INDUSTRIAL |
+| `TXN413` | 2026-09-15 | CREDIT | ₹405,000.00 | OAKRIDGE EXPORTS |
+| `TXN416` | 2026-09-18 | CREDIT | ₹362,000.00 | SILVER OAK TRADING |
+| `TXN422` | 2026-09-23 | CREDIT | ₹440,000.00 | HORIZON PROCUREMENT |
+| `TXN425` | 2026-09-27 | CREDIT | ₹395,000.00 | CRESTLINE INDUSTRIAL |
+| `TXN434` | 2026-10-05 | CREDIT | ₹620,000.00 | NORTHGATE COMPONENTS |
+| `TXN435` | 2026-10-05 | DEBIT | ₹275,000.00 | LUMEN CONSULTING |
+| `TXN439` | 2026-10-10 | CREDIT | ₹515,000.00 | MARINER GLOBAL TRADE |
+| `TXN440` | 2026-10-10 | DEBIT | ₹240,000.00 | LUMEN CONSULTING |
+| `TXN442` | 2026-10-15 | CREDIT | ₹455,000.00 | NORTHGATE COMPONENTS |
+| `TXN443` | 2026-10-15 | DEBIT | ₹205,000.00 | LUMEN CONSULTING |
+| `TXN445` | 2026-10-20 | CREDIT | ₹575,000.00 | WESTBROOK MATERIALS |
+| `TXN446` | 2026-10-20 | DEBIT | ₹255,000.00 | LUMEN CONSULTING |
+| `TXN451` | 2026-10-25 | CREDIT | ₹490,000.00 | MARINER GLOBAL TRADE |
+| `TXN452` | 2026-10-25 | DEBIT | ₹218,000.00 | LUMEN CONSULTING |
 
 ## 4. Detection Findings
 
@@ -222,59 +245,7 @@ Queue items are ranked deterministically by priority tier, independent domain co
 
 ## 10. Interpretation
 
-# AML Investigation Report: Arjun Malhotra (Account XX6384)
-**Period: 01 Sep 2026 – 28 Oct 2026 | Total Transactions: 54**
-
----
-
-## 1. Observed Evidence
-
-### Transaction Overview
-| Metric | Value |
-|---|---|
-| Total Transactions | 54 |
-| Total Credits | ₹5,065,000.00 |
-| Total Debits | ₹4,391,690.00 |
-| Net Flow | +₹673,310.00 |
-| Unique Counterparties | **28** |
-| Customer Degree (Network) | 28 |
-
-### Top Counterparties by Volume
-| Counterparty | Txn Count | Total Amount | Direction |
-|---|---|---|---|
-| **LUMEN CONSULTING** | 11 | ₹2,161,000.00 (22.9%) | Debit (outgoing) |
-| **RIVERBEND SUPPLIERS** | 10 | ₹1,333,000.00 | Debit (outgoing) |
-| NORTHGATE COMPONENTS | 2 | ₹1,075,000.00 | Credit (incoming) |
-| MARINER GLOBAL TRADE | 2 | ₹1,005,000.00 | Credit (incoming) |
-| CRESTLINE INDUSTRIAL | 2 | ₹713,000.00 | Credit (incoming) |
-
-### Network Topology Patterns Detected
-- **One-to-Many Star Network**: The account connects to 28 distinct counterparties, with the customer as the central hub distributing funds outward. - **Dominant High-Volume Counterparty**: LUMEN CONSULTING accounts for 22.9% of all counterparty volume across 11 transactions, all debits (outgoing). - **Rapid Pass-Through Pattern**: Credits from multiple sources (AURORA MEDIA LABS, OAKRIDGE EXPORTS, CRESTLINE INDUSTRIAL, NORTHGATE COMPONENTS, MARINER GLOBAL TRADE, etc.) are followed by debits distributed across a wide array of counterparties. ### Counterparty Anomalies Noted
-- **Multiple generic/anonymous counterparty names**: COUNTERPARTY K11, K12, K13, L21, L22, L23, T41, T42, V51, V52, V53 — these appear to be pseudonymous or masked entities. - **Newly observed counterparties**: NEW COUNTERPARTY Z31, Z32, Z33 — recent additions to the network within the statement period. - **RIVERBEND SUPPLIERS**: 10 debit transactions totaling ₹1,333,000 — high frequency of outgoing payments. ---
-
-## 2. Relevant AML Reference
-
-Based on the observed patterns, the following AML typologies are relevant for context:
-
-- **Rapid Movement of Funds / Pass-Through Activity**: Where an account receives credits from multiple sources and quickly distributes funds to numerous counterparties, potentially obscuring the origin of funds. - **Layering**: The process of conducting complex transactions to distance illicit funds from their source. The one-to-many topology with 28 counterparties and high transaction frequency is consistent with layering indicators. - **Structuring / Smurfing**: Breaking down large transactions into smaller amounts across multiple counterparties to avoid detection thresholds. - **Conduit Accounts**: Accounts that serve as intermediaries, receiving and disbursing funds with minimal retention — the net flow of ₹673,310 (relatively modest compared to gross flows of ₹9.4M) may suggest this account is functioning as a conduit. ---
-
-## 3. Interpretation & Risk Indicators
-
-The following **investigation signals** and **potential risk indicators** have been identified:
-
-### 🔴 High-Priority Signals
-1. **Unusually high counterparty diversity (28 unique entities)** — significantly elevated for a single account over a 2-month period. 2. **Dominant outgoing counterparty (LUMEN CONSULTING)** — 11 transactions totaling ₹2,161,000, all debits, representing nearly 23% of counterparty volume. This concentration warrants enhanced scrutiny. 3. **One-to-many distribution topology** — the account receives credits from a limited set of sources and distributes debits to a much wider set of recipients, consistent with potential layering/pass-through behavior. 4. **Presence of pseudonymous counterparties** — multiple entities labeled as "COUNTERPARTY K/L/T/V" with numeric suffixes, which may indicate obscured beneficial ownership. ### 🟡 Medium-Priority Signals
-5. **Newly established counterparty relationships** — NEW COUNTERPARTY Z31, Z32, Z33 appeared within the statement period, suggesting rapid expansion of the network. 6. **High-frequency, moderate-value debits** to RIVERBEND SUPPLIERS (10 transactions) and LUMEN CONSULTING (11 transactions) — repetitive payment patterns. 7. **Gross-to-net flow ratio**: Total gross flows (~₹9.46M) vs. net flow (₹673,310) — the account processes significantly more money than it retains, a potential conduit indicator. ---
-
-## 4. Limitations & Caveats
-
-- **No definitive conclusion of illicit activity**: The patterns identified are **investigative signals only** and do not constitute evidence of money laundering, fraud, or any criminal offense. - **Context gap**: The customer's stated occupation, source of wealth, expected transaction profile, and business rationale for these transactions are unknown. Many of these counterparties could represent legitimate business operations (e.g., a trader, consultant, or distributor). - **Rule engine output**: The deterministic AML rule engine and Isolation Forest anomaly detection were executed, but the specific flagged transaction IDs and severity scores were not fully enumerated in the output. A deeper review of the rule trigger details is recommended. - **Temporal analysis**: The exact sequencing and timing (velocity) of credits-to-debits was not fully analyzed; intraday or same-day pass-through patterns would strengthen or weaken the layering hypothesis. ---
-
-## 5. Recommended Actions for Human Review
-
-1. **Review LUMEN CONSULTING relationship** — Obtain beneficial ownership information and business rationale for the 11 high-value debit transactions (₹2,161,000 total). 2. **Investigate pseudonymous counterparties** — Identify the real entities behind COUNTERPARTY K/L/T/V designations. 3. **Verify source of funds** — Confirm the origin of credits from NORTHGATE COMPONENTS, MARINER GLOBAL TRADE, CRESTLINE INDUSTRIAL, and other credit sources. 4. **Assess network structure** — Determine whether the one-to-many distribution pattern serves a legitimate business purpose or represents potential layering. 5. **Cross-reference with customer profile** — Compare observed transaction patterns against the customer's known occupation, income level, and historical behavior. ---
-
-*This report is generated for compliance investigation purposes only. It does not assert guilt or criminal liability. All findings are subject to human analyst verification and further due diligence.*
+Investigation completed for customer Arjun Malhotra (Account XX6384). Evaluated 54 transactions with total turnover of ₹9,456,690.00. Unsupervised Isolation Forest detection flagged 6 statistical anomalies: TXN401, TXN404, TXN434, TXN442, TXN445, TXN451. Deterministic screening identified 46 rule finding(s) including large transaction thresholds, rapid fund movement, and new counterparties. Transactions with multi-signal convergence have been prioritized for human compliance officer review.
 
 ## 11. Limitations
 
@@ -283,7 +254,7 @@ The following **investigation signals** and **potential risk indicators** have b
 ## 12. Recommended Next Steps
 
 - Conduct Enhanced Customer Due Diligence (EDD) to verify the declared commercial profile and purpose of the account.
-- Review transactional source documents (invoices, commercial agreements, transport receipts) for high-volume counterparties including LUMEN CONSULTING, NORTHGATE COMPONENTS, and WESTBROOK MATERIALS.
+- Review transactional source documents (invoices, commercial agreements, transport receipts) for high-volume counterparties including LUMEN CONSULTING.
 - Cross-reference rapid pass-through sequences with public corporate registry databases to verify counterparty corporate status and beneficial ownership.
 - Compare observed velocity and volume surges against baseline account expectations documented at onboarding.
 - Escalate multi-signal convergence review items to Senior Compliance Management in accordance with institutional SAR/STR reporting procedures where warranted.
@@ -291,12 +262,12 @@ The following **investigation signals** and **potential risk indicators** have b
 ## 13. Critic Validation
 
 - **Audit Outcome**: **PASSED** ✓
-- **Evidence References Checked**: 0 confirmed
+- **Evidence References Checked**: 6 confirmed
 - **Statement Transactions Analyzed**: 54
-- **Verified References**: 0
+- **Verified References**: 6
 - **Unverified References**: 0
 - **Human Review Queue Items**: 50
-- **Factual Grounding**: All referenced transactions, dates, amounts, and flow directions match verified statement records. No unverified legal accusations detected.
+- **Factual Grounding**: All 6 referenced transactions, dates, amounts, and flow directions match verified statement records. No unverified legal accusations detected.
 
 - **Revision Cycles**: 0 of maximum 2
 

@@ -22,6 +22,20 @@ from aml_copilot.profiling.customer_profile import CustomerProfile
 # Canonical Evidence Models
 # ---------------------------------------------------------------------------
 
+class CanonicalTransaction(BaseModel):
+    """Universal canonical transaction model independent of input source (PDF, CSV, Excel, API, DB)."""
+
+    transaction_id: str = Field(..., description="Unique transaction identifier")
+    date: Optional[str] = Field(default=None, description="ISO format date (YYYY-MM-DD)")
+    direction: str = Field(..., description="Flow direction ('credit' or 'debit')")
+    amount: float = Field(..., description="Monetary amount of transaction")
+    currency: str = Field(default="INR", description="Currency symbol or ISO code")
+    counterparty: Optional[str] = Field(default=None, description="Counterparty entity name")
+    description: Optional[str] = Field(default=None, description="Transaction narrative description")
+    balance: Optional[float] = Field(default=None, description="Running account balance after transaction")
+    source: str = Field(default="canonical_statement", description="Source provenance identifier")
+
+
 class CanonicalRuleFinding(BaseModel):
     """Factual finding from a deterministic rule engine trigger."""
 
@@ -30,6 +44,7 @@ class CanonicalRuleFinding(BaseModel):
     rule_name: str = Field(..., description="Human-readable rule title")
     severity: str = Field(default="MEDIUM", description="Assigned severity (INFO, LOW, MEDIUM, HIGH)")
     observation: str = Field(..., description="Factual description of the triggered condition")
+    evidence: str = Field(default="", description="Factual evidence string")
     supporting_transaction_ids: List[str] = Field(
         default_factory=list, description="Exact transactions triggering this rule"
     )
@@ -39,6 +54,7 @@ class CanonicalRuleFinding(BaseModel):
     supporting_values: Dict[str, Any] = Field(
         default_factory=dict, description="Deterministic numeric values, ratios, and thresholds"
     )
+    provenance: str = Field(default="rule_engine", description="Source provenance tracking")
 
 
 class CanonicalAnomalyFinding(BaseModel):
@@ -46,13 +62,18 @@ class CanonicalAnomalyFinding(BaseModel):
 
     transaction_id: str = Field(..., description="Flagged transaction identifier")
     anomaly_score: float = Field(..., description="Isolation Forest decision score")
+    model: str = Field(default="isolation_forest", description="Model used for anomaly detection")
     status: str = Field(default="Statistical Outlier", description="Anomaly status label")
     feature_summary: Dict[str, float] = Field(
         default_factory=dict, description="Key numerical feature values for this transaction"
     )
+    features: Dict[str, float] = Field(
+        default_factory=dict, description="Key numerical feature values alias"
+    )
     supporting_transaction_details: Dict[str, Any] = Field(
         default_factory=dict, description="Verified statement transaction fields"
     )
+    provenance: str = Field(default="isolation_forest", description="Source provenance tracking")
 
 
 class CanonicalProfile(BaseModel):
@@ -73,6 +94,27 @@ class CanonicalProfile(BaseModel):
     largest_credit_amount: Optional[float] = None
     largest_debit_amount: Optional[float] = None
     indicators: List[str] = Field(default_factory=list)
+    provenance: str = Field(default="customer_profiler", description="Source provenance tracking")
+
+    @property
+    def transaction_count(self) -> int:
+        return self.total_transactions
+
+    @property
+    def net_flow(self) -> float:
+        return self.net_cash_flow
+
+    @property
+    def average_transaction(self) -> float:
+        return self.average_transaction_amount
+
+    @property
+    def peak_credit(self) -> Optional[float]:
+        return self.largest_credit_amount
+
+    @property
+    def peak_debit(self) -> Optional[float]:
+        return self.largest_debit_amount
 
 
 class CanonicalNetworkFinding(BaseModel):
@@ -80,6 +122,9 @@ class CanonicalNetworkFinding(BaseModel):
 
     pattern_name: str = Field(..., description="Identifier of the topological network pattern")
     description: str = Field(..., description="Objective description of the graph pattern")
+    counterparties: List[str] = Field(
+        default_factory=list, description="Counterparties involved in the pattern"
+    )
     involved_nodes: List[str] = Field(
         default_factory=list, description="Customer and counterparty entities involved"
     )
@@ -87,6 +132,7 @@ class CanonicalNetworkFinding(BaseModel):
         default_factory=list, description="Transactions establishing this network link"
     )
     details: Dict[str, Any] = Field(default_factory=dict)
+    provenance: str = Field(default="network_analyzer", description="Source provenance tracking")
 
 
 class CanonicalRAGEvidence(BaseModel):
@@ -94,8 +140,12 @@ class CanonicalRAGEvidence(BaseModel):
 
     source: str = Field(..., description="Guidance filename or document key")
     section: str = Field(default="General", description="Guidance section or topic heading")
+    title: str = Field(default="", description="Reference document title")
     citation: str = Field(default="", description="Citation string")
+    content: str = Field(default="", description="Relevant reference text")
     retrieved_text: str = Field(default="", description="Relevant guidance excerpt")
+    relevance: float = Field(default=1.0, description="Relevance score")
+    provenance: str = Field(default="aml_knowledge_base", description="Source provenance tracking")
 
 
 class HumanReviewItem(BaseModel):
@@ -106,10 +156,15 @@ class HumanReviewItem(BaseModel):
     amount: Optional[float] = Field(default=None, description="Transaction monetary amount")
     direction: Optional[str] = Field(default=None, description="Flow classification ('credit' or 'debit')")
     flow_type: Optional[str] = Field(default=None, description="Flow classification alias ('credit' or 'debit')")
+    currency: str = Field(default="INR", description="Currency symbol or code")
     counterparty: Optional[str] = Field(default=None, description="Counterparty entity name")
     reasons: List[str] = Field(
         default_factory=list,
         description="Documented detection reasons qualifying this transaction for review",
+    )
+    domains: List[str] = Field(
+        default_factory=list,
+        description="Independent signal domains qualifying this transaction",
     )
     supporting_finding_ids: List[str] = Field(
         default_factory=list,
@@ -123,6 +178,10 @@ class HumanReviewItem(BaseModel):
         default="",
         description="Factual summary of evidence convergence for human reviewer",
     )
+    provenance: str = Field(
+        default="evidence_convergence",
+        description="Source provenance tracking",
+    )
 
 
 class CanonicalEvidence(BaseModel):
@@ -133,6 +192,7 @@ class CanonicalEvidence(BaseModel):
     statement_period: Optional[str] = None
     total_transactions: int = 0
 
+    canonical_transactions: List[CanonicalTransaction] = Field(default_factory=list)
     rule_findings: List[CanonicalRuleFinding] = Field(default_factory=list)
     statistical_anomalies: List[CanonicalAnomalyFinding] = Field(default_factory=list)
     customer_profile: Optional[CanonicalProfile] = None
@@ -145,6 +205,18 @@ class CanonicalEvidence(BaseModel):
 
     human_review_items: List[HumanReviewItem] = Field(default_factory=list)
     all_flagged_transaction_ids: List[str] = Field(default_factory=list)
+
+    def get_transaction(self, transaction_id: str) -> Optional[CanonicalTransaction]:
+        """Retrieve a specific canonical transaction by ID."""
+        for t in self.canonical_transactions:
+            if t.transaction_id == transaction_id:
+                return t
+        return None
+
+    def high_value_transactions(self, threshold: float = 200000.0) -> List[CanonicalTransaction]:
+        """Deterministically filter transactions meeting or exceeding configured monitoring threshold."""
+        return [t for t in self.canonical_transactions if t.amount >= threshold]
+
 
     @property
     def anomaly_transaction_ids(self) -> List[str]:
@@ -315,9 +387,11 @@ def select_human_review_items(
                 flow_type=direction,
                 counterparty=t.counterparty,
                 reasons=distinct_reasons,
+                domains=sorted(list(domains)),
                 supporting_finding_ids=finding_ids,
                 priority=priority,
                 evidence_summary=evidence_summary,
+                provenance="evidence_convergence",
             )
         )
 
@@ -327,6 +401,8 @@ def select_human_review_items(
             t = stmt_txns[tid]
             amt = t.credit if t.credit is not None else t.debit
             dir_val = "credit" if t.credit is not None else "debit"
+            fb_distinct = sorted(list(set(reasons)))
+            fb_domains = sorted(list({SIGNAL_DOMAINS.get(r, "OTHER") for r in fb_distinct}))
             items.append(
                 HumanReviewItem(
                     transaction_id=tid,
@@ -335,10 +411,12 @@ def select_human_review_items(
                     direction=dir_val,
                     flow_type=dir_val,
                     counterparty=t.counterparty,
-                    reasons=sorted(list(set(reasons))),
+                    reasons=fb_distinct,
+                    domains=fb_domains,
                     supporting_finding_ids=sorted(list(set(txn_finding_ids.get(tid, [])))),
                     priority="LOW",
                     evidence_summary=f"Transaction {tid} noted under structural baseline rule screening.",
+                    provenance="evidence_convergence",
                 )
             )
 
@@ -379,6 +457,27 @@ def build_canonical_evidence(
     from aml_copilot.profiling.profiler import build_customer_profile
 
     stmt_txns = {t.transaction_id: t for t in statement.transactions if t.transaction_id}
+
+    # Populate universal canonical transactions
+    canonical_txns: List[CanonicalTransaction] = []
+    for t in statement.transactions:
+        if not t.transaction_id:
+            continue
+        dir_val = "credit" if t.credit is not None else "debit"
+        amt_val = t.credit if t.credit is not None else (t.debit or 0.0)
+        canonical_txns.append(
+            CanonicalTransaction(
+                transaction_id=t.transaction_id,
+                date=t.date.isoformat() if t.date else None,
+                direction=dir_val,
+                amount=round(amt_val, 2),
+                currency="INR",
+                counterparty=t.counterparty,
+                description=t.description,
+                balance=round(t.balance, 2) if t.balance is not None else None,
+                source="canonical_statement",
+            )
+        )
 
     # 1. Detection findings (Rules & Isolation Forest)
     if detection_result is None:
@@ -532,6 +631,7 @@ def build_canonical_evidence(
         account_number=statement.account_number,
         statement_period=statement.statement_period,
         total_transactions=statement.total_transactions,
+        canonical_transactions=canonical_txns,
         rule_findings=rule_findings,
         statistical_anomalies=statistical_anomalies,
         customer_profile=canonical_profile,
@@ -544,3 +644,91 @@ def build_canonical_evidence(
         human_review_items=human_review_items,
         all_flagged_transaction_ids=all_flagged_list,
     )
+
+
+def reconcile_customer_profile(
+    profile: Optional[CanonicalProfile],
+    canonical_transactions: List[CanonicalTransaction],
+) -> None:
+    """Enforce strict mathematical reconciliation invariants between customer profile and canonical transactions.
+
+    Invariants:
+    1. profile.transaction_count == len(transactions)
+    2. profile.total_credits == calculated_total_credits
+    3. profile.total_debits == calculated_total_debits
+    4. profile.net_flow == total_credits - total_debits
+    5. profile.unique_counterparties == calculated_unique_counterparties
+    6. profile.peak_credit == calculated_peak_credit
+    7. profile.peak_debit == calculated_peak_debit
+
+    Raises:
+        ReportReconciliationError: If any invariant is violated.
+    """
+    from aml_copilot.exceptions import ReportReconciliationError
+
+    if profile is None or not canonical_transactions:
+        return
+
+    txns = canonical_transactions
+
+    # Invariant 1: Transaction count
+    if profile.total_transactions != len(txns):
+        raise ReportReconciliationError(
+            f"Profile transaction_count invariant failed: profile has {profile.total_transactions}, "
+            f"canonical transactions count is {len(txns)}."
+        )
+
+    # Invariant 2: Total credits
+    calc_credits = round(sum(t.amount for t in txns if t.direction == "credit"), 2)
+    if abs(profile.total_credits - calc_credits) > 0.05:
+        raise ReportReconciliationError(
+            f"Profile total_credits invariant failed: profile has ₹{profile.total_credits:,.2f}, "
+            f"reconciled sum is ₹{calc_credits:,.2f}."
+        )
+
+    # Invariant 3: Total debits
+    calc_debits = round(sum(t.amount for t in txns if t.direction == "debit"), 2)
+    if abs(profile.total_debits - calc_debits) > 0.05:
+        raise ReportReconciliationError(
+            f"Profile total_debits invariant failed: profile has ₹{profile.total_debits:,.2f}, "
+            f"reconciled sum is ₹{calc_debits:,.2f}."
+        )
+
+    # Invariant 4: Net flow
+    calc_net_flow = round(calc_credits - calc_debits, 2)
+    if abs(profile.net_cash_flow - calc_net_flow) > 0.05:
+        raise ReportReconciliationError(
+            f"Profile net_flow invariant failed: profile has ₹{profile.net_cash_flow:,.2f}, "
+            f"reconciled net flow is ₹{calc_net_flow:,.2f}."
+        )
+
+    # Invariant 5: Unique counterparties
+    calc_cps = len(set(t.counterparty.strip() for t in txns if t.counterparty and t.counterparty.strip()))
+    if profile.unique_counterparties != calc_cps:
+        raise ReportReconciliationError(
+            f"Profile unique_counterparties invariant failed: profile has {profile.unique_counterparties}, "
+            f"reconciled count is {calc_cps}."
+        )
+
+    # Invariant 6: Peak credit
+    credit_amts = [t.amount for t in txns if t.direction == "credit"]
+    calc_peak_credit = max(credit_amts) if credit_amts else None
+    if calc_peak_credit is not None and profile.largest_credit_amount is not None:
+        if abs(profile.largest_credit_amount - calc_peak_credit) > 0.05:
+            raise ReportReconciliationError(
+                f"Profile peak_credit invariant failed: profile has ₹{profile.largest_credit_amount:,.2f}, "
+                f"reconciled peak credit is ₹{calc_peak_credit:,.2f}."
+            )
+
+    # Invariant 7: Peak debit
+    debit_amts = [t.amount for t in txns if t.direction == "debit"]
+    calc_peak_debit = max(debit_amts) if debit_amts else None
+    if calc_peak_debit is not None and profile.largest_debit_amount is not None:
+        if abs(profile.largest_debit_amount - calc_peak_debit) > 0.05:
+            raise ReportReconciliationError(
+                f"Profile peak_debit invariant failed: profile has ₹{profile.largest_debit_amount:,.2f}, "
+                f"reconciled peak debit is ₹{calc_peak_debit:,.2f}."
+            )
+
+    return True
+

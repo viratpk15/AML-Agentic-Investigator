@@ -275,6 +275,190 @@ def validate_report_evidence(
                     errors.append(msg)
                     provenance_failures.append(msg)
 
+    # 13. Direction contradiction checks in narrative text
+    for s in sentences:
+        s_tids = re.findall(r"\bTXN\d+\b", s)
+        if not s_tids:
+            continue
+        low_s = s.lower()
+        is_credit_claim = any(
+            w in low_s
+            for w in [
+                "incoming credit", "credit of", "received from", "deposit of",
+                "credit transfer", "was a credit", "is a credit", "as a credit",
+                "credit transaction",
+            ]
+        )
+        is_debit_claim = any(
+            w in low_s
+            for w in [
+                "outgoing debit", "debit of", "transferred to", "payment to",
+                "withdrawal of", "debit transfer", "was a debit", "is a debit",
+                "as a debit", "debit transaction",
+            ]
+        )
+        for tid in s_tids:
+            if tid in stmt_txns:
+                t = stmt_txns[tid]
+                if is_credit_claim and not is_debit_claim and t.credit is None and t.debit is not None:
+                    msg = (
+                        f"Direction contradiction for '{tid}': narrative claims it was a credit, "
+                        f"but canonical evidence confirms an outgoing debit of ₹{t.debit:,.2f}."
+                    )
+                    errors.append(msg)
+                    provenance_failures.append(msg)
+                elif is_debit_claim and not is_credit_claim and t.debit is None and t.credit is not None:
+                    msg = (
+                        f"Direction contradiction for '{tid}': narrative claims it was a debit, "
+                        f"but canonical evidence confirms an incoming credit of ₹{t.credit:,.2f}."
+                    )
+                    errors.append(msg)
+                    provenance_failures.append(msg)
+
+    # 14. Count contradiction checks in narrative text
+    if canonical_evidence:
+        rule_count_matches = re.findall(
+            r"\b(\d+)\s+(?:deterministic\s+)?rules?\s+(?:were\s+|are\s+|have\s+been\s+)?(?:triggered|flagged|signals?|findings?)",
+            all_report_text,
+            flags=re.IGNORECASE,
+        ) + re.findall(
+            r"(?:triggered|flagged)\s+(?:a\s+total\s+of\s+)?(\d+)\s+(?:deterministic\s+)?rules?",
+            all_report_text,
+            flags=re.IGNORECASE,
+        )
+        actual_rule_count = len(canonical_evidence.rule_findings)
+        for rc_str in rule_count_matches:
+            rc_val = int(rc_str)
+            if rc_val != actual_rule_count:
+                msg = (
+                    f"Count contradiction: narrative claims {rc_val} rules were triggered, "
+                    f"but canonical evidence confirms exactly {actual_rule_count} rule findings."
+                )
+                errors.append(msg)
+                provenance_failures.append(msg)
+
+        anom_count_matches = re.findall(
+            r"\b(\d+)\s+(?:statistical\s+)?anomal(?:y|ies|ous\s+transactions?)(?:\s+(?:were|are|have\s+been)\s+(?:detected|flagged|identified))?",
+            all_report_text,
+            flags=re.IGNORECASE,
+        ) + re.findall(
+            r"(?:identified|flagged|detected)\s+(?:exactly\s+|a\s+total\s+of\s+)?(\d+)\s+(?:statistical\s+)?anomal(?:y|ies|ous\s+transactions?)",
+            all_report_text,
+            flags=re.IGNORECASE,
+        )
+        actual_anom_count = len(canonical_evidence.statistical_anomalies)
+        for ac_str in anom_count_matches:
+            ac_val = int(ac_str)
+            if ac_val != actual_anom_count:
+                msg = (
+                    f"Count contradiction: narrative claims {ac_val} anomalies, "
+                    f"but Isolation Forest identified exactly {actual_anom_count} anomalies."
+                )
+                errors.append(msg)
+                provenance_failures.append(msg)
+
+    # 15. Unsupported Entity Checks
+    canonical_entity_names = set()
+    if statement.customer_name:
+        canonical_entity_names.add(statement.customer_name.strip().upper())
+    for t in statement.transactions:
+        if t.counterparty:
+            canonical_entity_names.add(t.counterparty.strip().upper())
+    if canonical_evidence:
+        for nf in canonical_evidence.network_findings:
+            for node in nf.involved_nodes:
+                canonical_entity_names.add(node.strip().upper())
+        for rag in canonical_evidence.rag_evidence:
+            if rag.source:
+                canonical_entity_names.add(rag.source.strip().upper())
+            if rag.title:
+                canonical_entity_names.add(rag.title.strip().upper())
+
+    allowed_domain_terms = {
+        "PMLA", "FATF", "FIU", "RBI", "SAR", "STR", "AML", "KYC", "CDD", "EDD",
+        "INR", "IMPS", "NEFT", "RTGS", "UPI", "ATM", "GST", "ITR", "PEP", "CASH",
+        "SALARY", "RENT", "TRANSFER", "ISOLATION", "FOREST", "AI", "LLM", "COPILOT",
+        "PASS", "FAIL", "HIGH", "MEDIUM", "LOW", "CREDIT", "DEBIT", "NET", "FLOW",
+        "RULE", "FINDING", "ANOMALY", "TRANSACTION", "STATEMENT", "CUSTOMER", "ACCOUNT",
+        "OBSERVED", "EVIDENCE", "LIMITATIONS", "RECOMMENDATIONS", "INTERPRETATION",
+        "OVERVIEW", "SUMMARY", "BANK", "DETAILS", "ID", "TXN", "INDIA", "GLOBAL",
+        "INVESTIGATION", "REPORT", "INVOICE", "TRADING", "ENTERPRISE", "FINANCIAL",
+        "CRIME", "INTELLIGENCE", "UNIT", "CENTRAL", "RESERVE", "AUTHORITY", "EXECUTIVE",
+        "ENHANCED", "DUE", "DILIGENCE", "SENIOR", "COMPLIANCE", "MANAGEMENT", "REVIEW",
+        "STATISTICAL", "OUTLIER", "PASS-THROUGH", "LAYER", "STRUCTURING", "VELOCITY",
+        "RAPID", "MOVEMENT", "CONDUIT", "SOURCE", "PROVENANCE", "CHECK", "QUEUE",
+        "PARTIAL", "MAX", "ITERATIONS", "REACHED", "STATUS", "NORMAL", "BUDGET",
+        "EXCEEDED", "EXECUTION", "COMPLETED", "SCREENING", "PERIOD", "OBJECTIVE",
+    }
+
+    potential_entities = re.findall(r"\b[A-Z]{3,}(?:\s+[A-Z]{3,})+\b", all_report_text)
+    for pent in potential_entities:
+        pent_upper = pent.strip().upper()
+        words = set(pent_upper.split())
+        if words.issubset(allowed_domain_terms):
+            continue
+        if pent_upper not in canonical_entity_names:
+            msg = (
+                f"Unsupported entity: Narrative references '{pent}' which does not exist "
+                "in customer statement transactions or canonical evidence records."
+            )
+            errors.append(msg)
+            provenance_failures.append(msg)
+
+    # 16. Customer Profile Invariant Validation
+    if report.customer_profile and statement.transactions:
+        calc_credits = round(sum(t.credit for t in statement.transactions if t.credit is not None), 2)
+        calc_debits = round(sum(t.debit for t in statement.transactions if t.debit is not None), 2)
+        calc_net_flow = round(calc_credits - calc_debits, 2)
+        calc_cps = len({t.counterparty.strip() for t in statement.transactions if t.counterparty and t.counterparty.strip()})
+        calc_peak_cr = max([t.credit for t in statement.transactions if t.credit is not None], default=0.0)
+        calc_peak_db = max([t.debit for t in statement.transactions if t.debit is not None], default=0.0)
+
+        cp = report.customer_profile
+        if cp.total_transactions != statement.total_transactions:
+            errors.append(
+                f"Profile invariant violation: transaction_count ({cp.total_transactions}) != statement total ({statement.total_transactions})"
+            )
+        if abs(cp.total_credits - calc_credits) > 0.01:
+            errors.append(
+                f"Profile invariant violation: total_credits ({cp.total_credits}) != calculated credits ({calc_credits})"
+            )
+        if abs(cp.total_debits - calc_debits) > 0.01:
+            errors.append(
+                f"Profile invariant violation: total_debits ({cp.total_debits}) != calculated debits ({calc_debits})"
+            )
+        cp_net_flow = getattr(cp, "net_cash_flow", getattr(cp, "net_flow", 0.0))
+        if abs(cp_net_flow - calc_net_flow) > 0.01:
+            errors.append(
+                f"Profile invariant violation: net_flow ({cp_net_flow}) != calculated net flow ({calc_net_flow})"
+            )
+        if cp.unique_counterparties != calc_cps:
+            errors.append(
+                f"Profile invariant violation: unique_counterparties ({cp.unique_counterparties}) != calculated counterparties ({calc_cps})"
+            )
+        cp_peak_cr = getattr(cp, "largest_credit_amount", getattr(cp, "peak_credit", 0.0)) or 0.0
+        if abs(cp_peak_cr - calc_peak_cr) > 0.01:
+            errors.append(
+                f"Profile invariant violation: peak_credit ({cp_peak_cr}) != calculated peak credit ({calc_peak_cr})"
+            )
+        cp_peak_db = getattr(cp, "largest_debit_amount", getattr(cp, "peak_debit", 0.0)) or 0.0
+        if abs(cp_peak_db - calc_peak_db) > 0.01:
+            errors.append(
+                f"Profile invariant violation: peak_debit ({cp_peak_db}) != calculated peak debit ({calc_peak_db})"
+            )
+
+    # 17. Duplicate Report Prevention
+    try:
+        from aml_copilot.reporting.formatter import format_report_markdown
+        md = format_report_markdown(report)
+        title_count = len(re.findall(r"^#\s+AML\s+Investigation\s+Report", md, flags=re.MULTILINE | re.IGNORECASE))
+        if title_count > 1:
+            errors.append(
+                f"Duplicate report violation: Generated markdown contains {title_count} top-level '# AML Investigation Report' titles."
+            )
+    except Exception:
+        pass
+
     passed = len(errors) == 0 and len(provenance_failures) == 0
 
     return EvidenceValidationResult(

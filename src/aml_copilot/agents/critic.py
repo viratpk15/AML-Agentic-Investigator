@@ -146,8 +146,22 @@ def evaluate_investigation_draft(
                 w_end = min(len(s), tid_idx + 65)
                 local_s = s[w_start:w_end].lower()
 
-                is_credit_claim = any(w in local_s for w in ["incoming credit", "credit of", "received from", "deposit of", "credit transfer"])
-                is_debit_claim = any(w in local_s for w in ["outgoing debit", "debit of", "transferred to", "payment to", "withdrawal of", "debit transfer"])
+                is_credit_claim = any(
+                    w in local_s
+                    for w in [
+                        "incoming credit", "credit of", "received from", "deposit of",
+                        "credit transfer", "was a credit", "is a credit", "as a credit",
+                        "credit transaction",
+                    ]
+                )
+                is_debit_claim = any(
+                    w in local_s
+                    for w in [
+                        "outgoing debit", "debit of", "transferred to", "payment to",
+                        "withdrawal of", "debit transfer", "was a debit", "is a debit",
+                        "as a debit", "debit transaction",
+                    ]
+                )
                 if is_credit_claim and not is_debit_claim and t.credit is None and t.debit is not None:
                     msg = f"Direction mismatch for '{tid}': claimed as incoming credit, but statement record is an outgoing debit of ₹{t.debit:,.2f}."
                     issues.append(msg)
@@ -287,7 +301,99 @@ def evaluate_investigation_draft(
             issues.append(f"Safety boundary violated: {desc}")
             required_revisions.append("Rephrase findings using professional non-judgmental language: 'unusual activity observed', 'investigation signal', 'warrants compliance review'.")
 
-    # 7. Overall Pass/Fail Status
+    # 8. Count Contradiction Checks
+    if canonical_evidence:
+        # Rule count checks
+        rule_count_matches = re.findall(
+            r"\b(\d+)\s+(?:deterministic\s+)?rules?\s+(?:were\s+|are\s+|have\s+been\s+)?(?:triggered|flagged|signals?|findings?)",
+            clean_text,
+            flags=re.IGNORECASE,
+        ) + re.findall(
+            r"(?:triggered|flagged)\s+(?:a\s+total\s+of\s+)?(\d+)\s+(?:deterministic\s+)?rules?",
+            clean_text,
+            flags=re.IGNORECASE,
+        )
+        actual_rule_count = len(canonical_evidence.rule_findings)
+        for rc_str in rule_count_matches:
+            rc_val = int(rc_str)
+            if rc_val != actual_rule_count:
+                msg = (
+                    f"Count contradiction: draft claims {rc_val} rules were triggered, "
+                    f"but canonical evidence confirms exactly {actual_rule_count} rule findings."
+                )
+                issues.append(msg)
+                unsupported_claims.append(msg)
+                required_revisions.append(f"Correct rule count to {actual_rule_count}.")
+
+        # Anomaly count checks
+        anom_count_matches = re.findall(
+            r"\b(\d+)\s+(?:statistical\s+)?anomal(?:y|ies|ous\s+transactions?)(?:\s+(?:were|are|have\s+been)\s+(?:detected|flagged|identified))?",
+            clean_text,
+            flags=re.IGNORECASE,
+        ) + re.findall(
+            r"(?:identified|flagged|detected)\s+(?:exactly\s+|a\s+total\s+of\s+)?(\d+)\s+(?:statistical\s+)?anomal(?:y|ies|ous\s+transactions?)",
+            clean_text,
+            flags=re.IGNORECASE,
+        )
+        actual_anom_count = len(canonical_evidence.statistical_anomalies)
+        for ac_str in anom_count_matches:
+            ac_val = int(ac_str)
+            if ac_val != actual_anom_count:
+                msg = (
+                    f"Count contradiction: draft claims {ac_val} anomalies, "
+                    f"but Isolation Forest identified exactly {actual_anom_count} anomalies."
+                )
+                issues.append(msg)
+                unsupported_claims.append(msg)
+                required_revisions.append(f"Correct anomaly count to {actual_anom_count}.")
+
+    # 9. Unsupported Entity Checks
+    canonical_entity_names = set()
+    if statement.customer_name:
+        canonical_entity_names.add(statement.customer_name.strip().upper())
+    for t in statement.transactions:
+        if t.counterparty:
+            canonical_entity_names.add(t.counterparty.strip().upper())
+    if canonical_evidence:
+        for nf in canonical_evidence.network_findings:
+            for node in nf.involved_nodes:
+                canonical_entity_names.add(node.strip().upper())
+        for rag in canonical_evidence.rag_evidence:
+            if rag.source:
+                canonical_entity_names.add(rag.source.strip().upper())
+            if rag.title:
+                canonical_entity_names.add(rag.title.strip().upper())
+
+    allowed_domain_terms = {
+        "PMLA", "FATF", "FIU", "RBI", "SAR", "STR", "AML", "KYC", "CDD", "EDD",
+        "INR", "IMPS", "NEFT", "RTGS", "UPI", "ATM", "GST", "ITR", "PEP", "CASH",
+        "SALARY", "RENT", "TRANSFER", "ISOLATION", "FOREST", "AI", "LLM", "COPILOT",
+        "PASS", "FAIL", "HIGH", "MEDIUM", "LOW", "CREDIT", "DEBIT", "NET", "FLOW",
+        "RULE", "FINDING", "ANOMALY", "TRANSACTION", "STATEMENT", "CUSTOMER", "ACCOUNT",
+        "OBSERVED", "EVIDENCE", "LIMITATIONS", "RECOMMENDATIONS", "INTERPRETATION",
+        "OVERVIEW", "SUMMARY", "BANK", "DETAILS", "ID", "TXN", "INDIA", "GLOBAL",
+        "INVESTIGATION", "REPORT", "INVOICE", "TRADING", "ENTERPRISE", "FINANCIAL",
+        "CRIME", "INTELLIGENCE", "UNIT", "CENTRAL", "RESERVE", "AUTHORITY",
+        "PARTIAL", "MAX", "ITERATIONS", "REACHED", "STATUS", "NORMAL", "BUDGET",
+        "EXCEEDED", "EXECUTION", "COMPLETED", "SCREENING", "PERIOD", "OBJECTIVE",
+    }
+
+    potential_entities = re.findall(r"\b[A-Z]{3,}(?:\s+[A-Z]{3,})+\b", clean_text)
+    for pent in potential_entities:
+        pent_upper = pent.strip().upper()
+        words = set(pent_upper.split())
+        if words.issubset(allowed_domain_terms):
+            continue
+        if pent_upper not in canonical_entity_names:
+            msg = (
+                f"Unsupported entity: draft references '{pent}' which does not exist "
+                "in customer statement transactions or canonical evidence records."
+            )
+            issues.append(msg)
+            unsupported_claims.append(msg)
+            required_revisions.append(f"Remove reference to unsupported entity '{pent}'.")
+
+    # 10. Overall Pass/Fail Status
     passed = (
         len(issues) == 0
         and len(unsupported_claims) == 0
@@ -295,7 +401,7 @@ def evaluate_investigation_draft(
         and len(missing_evidence) == 0
     )
 
-    # 8. Deterministic Transaction Counting Metrics
+    # 11. Deterministic Transaction Counting Metrics
     stmt_count = len(statement.transactions) if statement and statement.transactions else 0
     narrative_ref_count = len(cited_ids)
     hr_count = (
@@ -305,6 +411,8 @@ def evaluate_investigation_draft(
     )
     verified_ref_count = len([tid for tid in cited_ids if tid in stmt_txns])
     unverified_ref_count = len(invalid_txn_ids)
+    val_err_count = len(issues) + len(unsupported_claims) + len(safety_violations)
+    fact_claim_count = len(checked_txn_ids) + len(issues) + len(unsupported_claims)
 
     return CritiqueResult(
         passed=passed,
@@ -320,6 +428,8 @@ def evaluate_investigation_draft(
         human_review_transaction_count=hr_count,
         verified_transaction_reference_count=verified_ref_count,
         unverified_transaction_reference_count=unverified_ref_count,
+        factual_claim_count=fact_claim_count,
+        validation_error_count=val_err_count,
     )
 
 
