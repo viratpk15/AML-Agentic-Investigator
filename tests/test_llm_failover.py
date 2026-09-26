@@ -286,10 +286,10 @@ class TestLLMFactory:
         assert cfg.has_credentials()
 
     def test_fallback_configs_ordered(self):
-        s = self._settings(llm_fallback_providers="openrouter,nvidia")
+        s = self._settings(llm_fallback_providers="nvidia,openrouter")
         factory = LLMFactory(settings=s)
         fallbacks = factory.fallback_configs()
-        assert [c.name for c in fallbacks] == ["openrouter", "nvidia"]
+        assert [c.name for c in fallbacks] == ["nvidia", "openrouter"]
 
     def test_fallback_empty_when_not_configured(self):
         s = self._settings(llm_fallback_providers="")
@@ -359,6 +359,32 @@ class TestFailoverLLM:
         groq_mock.invoke.assert_called_once()
         openrouter_mock.invoke.assert_called_once()
         nvidia_mock.invoke.assert_called_once()
+
+    def test_three_tier_failover_groq_nvidia_openrouter(self):
+        """Verify failover proceeds groq -> nvidia -> openrouter."""
+        exc1 = Exception("429 TPM limit exceeded")
+        exc1.status_code = 429  # type: ignore[attr-defined]
+
+        groq_mock = _failing_llm(exc1)
+        nvidia_mock = _fake_llm("nvidia response")
+        openrouter_mock = _fake_llm("openrouter response")
+
+        events: list = []
+        flm = _make_failover(
+            [
+                (_groq_config(), groq_mock),
+                (_nvidia_config(), nvidia_mock),
+                (_openrouter_config(), openrouter_mock),
+            ],
+            events,
+        )
+
+        msgs = [HumanMessage(content="analyze transactions")]
+        result = flm._generate(msgs)
+        assert result.generations[0].message.content == "nvidia response"
+        groq_mock.invoke.assert_called_once()
+        nvidia_mock.invoke.assert_called_once()
+        openrouter_mock.invoke.assert_not_called()
 
     def test_primary_succeeds_no_fallback_attempted(self):
         groq_mock = _fake_llm("groq response")
