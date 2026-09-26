@@ -1,7 +1,6 @@
 """Comprehensive tests for AML investigation agent control and max-iteration semantics (Tasks 1-8)."""
 
 import datetime as dt
-from pathlib import Path
 from typing import Any, List, Optional
 import uuid
 
@@ -12,8 +11,7 @@ from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.messages import AIMessage, BaseMessage
 from langchain_core.outputs import ChatGeneration, ChatResult
 
-from aml_copilot.agents.investigation_agent import InvestigationAgent, run_investigation
-from aml_copilot.agents.models import CritiqueResult
+from aml_copilot.agents.investigation_agent import InvestigationAgent
 from aml_copilot.agents.state import InvestigationResult, InvestigationState, ToolExecutionRecord
 from aml_copilot.agents.sufficiency import (
     check_tool_call_redundancy,
@@ -344,11 +342,11 @@ def test_sse_max_iteration_event(monkeypatch: pytest.MonkeyPatch):
 
     with client.stream("GET", f"/investigations/{inv_id}/events") as sse_res:
         assert sse_res.status_code == 200
-        lines = [l for l in sse_res.iter_lines() if l]
+        lines = [line for line in sse_res.iter_lines() if line]
 
-    event_lines = [l for l in lines if l.startswith("data:")]
-    assert any("INVESTIGATION_MAX_ITERATIONS" in l for l in event_lines)
-    assert not any("INVESTIGATION_COMPLETED" in l for l in event_lines)
+    event_lines = [line for line in lines if line.startswith("data:")]
+    assert any("INVESTIGATION_MAX_ITERATIONS" in line for line in event_lines)
+    assert not any("INVESTIGATION_COMPLETED" in line for line in event_lines)
 
 
 # ---------------------------------------------------------------------------
@@ -437,6 +435,7 @@ def test_existing_successful_suspicious_investigation(sample_statement: Transact
     assert result.status == "COMPLETED"
     assert result.is_partial is False
     assert result.critic_status == "PASS"
+    assert result.critic_result is not None
     assert result.critic_result.passed is True
 
 

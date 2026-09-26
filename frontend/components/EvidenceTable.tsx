@@ -15,7 +15,7 @@ export default function EvidenceTable({ evidence = [], onSelectTransaction }: Ev
 
   const filtered = evidence.filter((ev) => {
     const matchesSearch =
-      ev.transaction_id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (ev.transaction_id || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
       (ev.counterparty && ev.counterparty.toLowerCase().includes(searchTerm.toLowerCase())) ||
       (ev.description && ev.description.toLowerCase().includes(searchTerm.toLowerCase()));
 

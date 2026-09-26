@@ -106,16 +106,62 @@ class KnowledgeReferenceItem(BaseModel):
 
 
 class RuleSummaryGroup(BaseModel):
-    """Grouped summary of deterministic rule findings by rule type to prevent repetitive narrative output."""
+    """Grouped summary of deterministic rule findings by rule type.
+
+    Canonical Semantic Contract
+    ---------------------------
+    finding_count
+        Number of independent rule events (EVENT_LEVEL) or triggering transactions
+        (TRANSACTION_LEVEL).  This is the authoritative count of 'how many times the
+        rule fired'.
+
+    severity_distribution
+        Counts of findings/events by severity.  INVARIANT:
+            finding_count == sum(severity_distribution.values())
+        NEVER derived by counting associated_transaction_ids.
+
+    associated_transaction_count
+        Total number of transactions that participated in the rule event(s).  For
+        TRANSACTION_LEVEL rules this equals finding_count.  For EVENT_LEVEL rules
+        this is >= finding_count (each event can span multiple transactions).
+
+    count (legacy alias)
+        Retained for backwards-compat; equals associated_transaction_count.
+    """
 
     rule_id: str = Field(..., description="Programmatic identifier of the detection rule")
     rule_name: str = Field(..., description="Human-readable title of the rule")
-    count: int = Field(..., description="Total count of transactions/instances triggering this rule")
+    granularity: str = Field(
+        default="EVENT_LEVEL",
+        description="TRANSACTION_LEVEL or EVENT_LEVEL — canonical finding unit",
+    )
+    finding_count: int = Field(
+        ...,
+        description=(
+            "Canonical count of independent rule findings/events. "
+            "Must equal sum(severity_distribution.values())."
+        ),
+    )
+    associated_transaction_count: int = Field(
+        ...,
+        description=(
+            "Total unique transactions participating across all findings. "
+            "For TRANSACTION_LEVEL equals finding_count; for EVENT_LEVEL >= finding_count."
+        ),
+    )
+    count: int = Field(
+        ...,
+        description="Legacy alias for associated_transaction_count (backwards compat).",
+    )
     severity_distribution: Dict[str, int] = Field(
-        default_factory=dict, description="Counts of triggers categorized by severity"
+        default_factory=dict,
+        description=(
+            "Counts of rule findings/events by severity. "
+            "Invariant: sum(values) == finding_count."
+        ),
     )
     supporting_transaction_ids: List[str] = Field(
-        default_factory=list, description="All unique transaction IDs triggering this rule"
+        default_factory=list, description="All unique transaction IDs associated with this rule"
     )
     representative_examples: List[str] = Field(
         default_factory=list, description="Key representative examples with amounts and dates"

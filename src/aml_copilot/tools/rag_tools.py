@@ -1,6 +1,6 @@
 """RAG tool for retrieving external AML educational reference knowledge."""
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 from langchain_core.tools import StructuredTool
 from pydantic import BaseModel, Field
 

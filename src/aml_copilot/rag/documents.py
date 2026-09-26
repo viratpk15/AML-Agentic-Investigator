@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 import os
 from pathlib import Path
 import re
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 
 @dataclass

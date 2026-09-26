@@ -14,13 +14,47 @@ class SignalSeverity(str, Enum):
     HIGH = "HIGH"
 
 
+class FindingGranularity(str, Enum):
+    """Canonical unit of a rule finding.
+
+    TRANSACTION_LEVEL: one finding per triggering transaction.
+    EVENT_LEVEL: one finding per independent event (day, window, statement-level pattern).
+    Associated transactions on an event-level finding are participants, not extra findings.
+    """
+
+    TRANSACTION_LEVEL = "TRANSACTION_LEVEL"
+    EVENT_LEVEL = "EVENT_LEVEL"
+
+
+# Explicit per-rule semantics. Unknown future rules default to EVENT_LEVEL so
+# associated transactions are never silently counted as findings.
+RULE_GRANULARITY: Dict[str, FindingGranularity] = {
+    "RULE_LARGE_TRANSACTION": FindingGranularity.TRANSACTION_LEVEL,
+    "RULE_SUDDEN_VOLUME_INCREASE": FindingGranularity.EVENT_LEVEL,
+    "RULE_LARGE_INFLOW_RAPID_OUTFLOW": FindingGranularity.EVENT_LEVEL,
+    "RULE_RAPID_MOVEMENT_OF_FUNDS": FindingGranularity.EVENT_LEVEL,
+    "RULE_MANY_NEW_COUNTERPARTIES": FindingGranularity.EVENT_LEVEL,
+    "RULE_HIGH_TRANSACTION_FREQUENCY": FindingGranularity.EVENT_LEVEL,
+    "RULE_HIGH_STATEMENT_FREQUENCY": FindingGranularity.EVENT_LEVEL,
+}
+
+
+def granularity_for_rule(rule_id: str) -> FindingGranularity:
+    """Return canonical finding granularity for a rule identifier."""
+    return RULE_GRANULARITY.get(rule_id, FindingGranularity.EVENT_LEVEL)
+
+
 class RuleSignal(BaseModel):
     """Structured signal emitted by a deterministic detection rule."""
 
     rule_id: str = Field(..., description="Unique programmatic identifier for the rule")
     rule_name: str = Field(..., description="Human-readable rule title")
     transaction_ids: List[str] = Field(
-        default_factory=list, description="IDs of transactions that triggered this rule"
+        default_factory=list, description="IDs of transactions associated with this finding"
+    )
+    granularity: FindingGranularity = Field(
+        default=FindingGranularity.EVENT_LEVEL,
+        description="Whether this signal is one finding per transaction or per independent event",
     )
     severity: SignalSeverity = Field(
         default=SignalSeverity.MEDIUM, description="Signal severity level"

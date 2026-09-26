@@ -9,7 +9,6 @@ from aml_copilot.services.pdf_parser import extract_pdf_text
 from aml_copilot.services.transaction_parser import parse_transactions
 from aml_copilot.tools.transaction_tools import (
     SearchTransactionsInput,
-    SearchTransactionsOutput,
     TransactionAnalyticsOutput,
     TransactionStatisticsOutput,
     create_analyze_transactions_tool,

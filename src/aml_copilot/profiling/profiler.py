@@ -1,12 +1,11 @@
 """Deterministic customer profiler calculating behavioral metrics and indicators."""
 
-import datetime as dt
-from typing import Any, Dict, List, Optional
+from typing import List, Optional
 import numpy as np
 
 from aml_copilot.analysis.transaction_analytics import analyze_transactions
 from aml_copilot.logger import get_logger
-from aml_copilot.models.transaction import Transaction, TransactionStatement
+from aml_copilot.models.transaction import TransactionStatement
 from aml_copilot.profiling.customer_profile import (
     BehavioralIndicator,
     CustomerProfile,
@@ -78,7 +77,7 @@ def build_customer_profile(statement: TransactionStatement) -> CustomerProfile:
     if credit_txns:
         peak_credit = max(credit_txns, key=lambda t: t.credit or 0.0)
         largest_credit_rec = LargestTransactionRecord(
-            transaction_id=peak_credit.transaction_id,
+            transaction_id=peak_credit.transaction_id or "",
             amount=peak_credit.credit or 0.0,
             date=peak_credit.date,
             description=peak_credit.description,
@@ -89,7 +88,7 @@ def build_customer_profile(statement: TransactionStatement) -> CustomerProfile:
     if debit_txns:
         peak_debit = max(debit_txns, key=lambda t: t.debit or 0.0)
         largest_debit_rec = LargestTransactionRecord(
-            transaction_id=peak_debit.transaction_id,
+            transaction_id=peak_debit.transaction_id or "",
             amount=peak_debit.debit or 0.0,
             date=peak_debit.date,
             description=peak_debit.description,
@@ -112,7 +111,7 @@ def build_customer_profile(statement: TransactionStatement) -> CustomerProfile:
     high_value_txns = [
         t.transaction_id
         for t in txns
-        if (t.credit or 0.0) >= 200000.0 or (t.debit or 0.0) >= 200000.0
+        if t.transaction_id and ((t.credit or 0.0) >= 200000.0 or (t.debit or 0.0) >= 200000.0)
     ]
     if high_value_txns:
         indicators.append(
@@ -134,6 +133,7 @@ def build_customer_profile(statement: TransactionStatement) -> CustomerProfile:
         turnover_txns = [
             t.transaction_id
             for t in sorted(txns, key=lambda x: (x.credit or 0.0) + (x.debit or 0.0), reverse=True)[:5]
+            if t.transaction_id
         ]
         indicators.append(
             BehavioralIndicator(
@@ -175,7 +175,8 @@ def build_customer_profile(statement: TransactionStatement) -> CustomerProfile:
         for t in txns:
             if t.counterparty and t.counterparty not in seen:
                 seen.add(t.counterparty)
-                first_seen_txns.append(t.transaction_id)
+                if t.transaction_id:
+                    first_seen_txns.append(t.transaction_id)
 
         indicators.append(
             BehavioralIndicator(
@@ -200,9 +201,9 @@ def build_customer_profile(statement: TransactionStatement) -> CustomerProfile:
                 if gap_days > 2:
                     break
                 if d_txn.debit and d_txn.debit >= 0.7 * c_txn.credit:
-                    if c_txn.transaction_id not in rapid_pairs:
+                    if c_txn.transaction_id and c_txn.transaction_id not in rapid_pairs:
                         rapid_pairs.append(c_txn.transaction_id)
-                    if d_txn.transaction_id not in rapid_pairs:
+                    if d_txn.transaction_id and d_txn.transaction_id not in rapid_pairs:
                         rapid_pairs.append(d_txn.transaction_id)
 
     if rapid_pairs:

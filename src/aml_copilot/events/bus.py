@@ -2,7 +2,7 @@
 
 import asyncio
 import time
-from typing import Any, AsyncIterator, Dict, List, Optional, Set
+from typing import AsyncIterator, Dict, List, Optional, Set
 
 from aml_copilot.events.models import EventType, InvestigationEvent
 from aml_copilot.logger import get_logger

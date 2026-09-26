@@ -1,7 +1,6 @@
 """Unit tests for M12 customer profiling and behavioral indicators."""
 
 import datetime as dt
-import pytest
 
 from aml_copilot.models.transaction import Transaction, TransactionStatement
 from aml_copilot.profiling.customer_profile import CustomerProfile
@@ -9,7 +8,6 @@ from aml_copilot.profiling.profiler import build_customer_profile
 from aml_copilot.tools.profile_tools import (
     GetCustomerProfileInput,
     create_get_customer_profile_tool,
-    execute_get_customer_profile,
 )
 
 

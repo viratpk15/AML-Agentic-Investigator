@@ -430,9 +430,9 @@ def test_parse_100_transactions_multi_page_resilience():
     for p in range(1, 6):
         page_lines = [
             "AML Investigation Copilot — Corporate Statement",
-            f"Customer Name: Enterprise Global Holdings",
-            f"Account Number: ACC-CORP-10088",
-            f"Statement Period: 01 Oct 2026 - 31 Oct 2026",
+            "Customer Name: Enterprise Global Holdings",
+            "Account Number: ACC-CORP-10088",
+            "Statement Period: 01 Oct 2026 - 31 Oct 2026",
             f"Page {p} of 5",
             # Single-line multi-column table header
             "Transaction ID   Date   Flow   Amount (INR)   Counterparty   Description   Reference",

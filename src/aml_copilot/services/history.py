@@ -7,7 +7,7 @@ Stores metadata and reports without sensitive credentials.
 import json
 from pathlib import Path
 from typing import Any, Dict, List, Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 from aml_copilot.logger import get_logger
 from aml_copilot.reporting.models import InvestigationReport

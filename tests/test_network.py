@@ -1,7 +1,6 @@
 """Unit tests for M13 network analysis and NetworkX graph construction."""
 
 import datetime as dt
-import pytest
 
 from aml_copilot.models.transaction import Transaction, TransactionStatement
 from aml_copilot.network.analysis import build_transaction_network
@@ -9,7 +8,6 @@ from aml_copilot.network.models import NetworkAnalysisResult
 from aml_copilot.tools.network_tools import (
     AnalyzeTransactionNetworkInput,
     create_analyze_transaction_network_tool,
-    execute_analyze_transaction_network,
 )
 
 

@@ -5,8 +5,6 @@ from langchain_core.tools import StructuredTool
 
 from aml_copilot.logger import get_logger
 from aml_copilot.models.transaction import TransactionStatement
-from aml_copilot.network.analysis import build_transaction_network
-from aml_copilot.profiling.profiler import build_customer_profile
 from aml_copilot.rag.service import RAGService
 from aml_copilot.tools.detection_tools import create_detect_anomalies_tool
 from aml_copilot.tools.network_tools import create_analyze_transaction_network_tool

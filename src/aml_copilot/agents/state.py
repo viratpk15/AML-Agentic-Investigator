@@ -8,7 +8,6 @@ from typing_extensions import TypedDict
 
 from aml_copilot.agents.models import (
     CritiqueResult,
-    EvidenceReference,
     InvestigationDraft,
     InvestigationFinding,
 )

@@ -89,6 +89,9 @@ export interface NetworkSummary {
 export interface RuleSummaryGroup {
   rule_id: string;
   rule_name: string;
+  granularity?: "TRANSACTION_LEVEL" | "EVENT_LEVEL" | string;
+  finding_count?: number;
+  associated_transaction_count?: number;
   count: number;
   severity: string;
   severity_distribution: Record<string, number>;
@@ -142,6 +145,14 @@ export interface InvestigationReport {
   aml_reference_context: KnowledgeReferenceItem[];
   evidence_convergence?: EvidenceConvergenceItem[];
   human_review_items?: HumanReviewItem[];
+  human_review_summary?: {
+    total_evaluated_count?: number;
+    prioritized_review_count?: number;
+    high_priority_count?: number;
+    medium_priority_count?: number;
+    low_priority_count?: number;
+    [key: string]: any;
+  };
   interpretation: string;
   critic_validation: CriticSummary;
   revision_history: RevisionSummary;

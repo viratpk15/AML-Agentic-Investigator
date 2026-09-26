@@ -6,24 +6,18 @@ import uuid
 import pytest
 from langchain_core.callbacks import CallbackManagerForLLMRun
 from langchain_core.language_models.chat_models import BaseChatModel
-from langchain_core.messages import AIMessage, BaseMessage, HumanMessage
+from langchain_core.messages import AIMessage, BaseMessage
 from langchain_core.outputs import ChatGeneration, ChatResult
 
 from aml_copilot.agents.critic import evaluate_investigation_draft
-from aml_copilot.agents.graph import (
-    build_investigation_graph,
-    route_after_critic,
-    should_continue_investigator,
-)
-from aml_copilot.agents.investigation_agent import InvestigationAgent, run_investigation
+from aml_copilot.agents.investigation_agent import InvestigationAgent
 from aml_copilot.agents.models import (
     CritiqueResult,
     EvidenceReference,
     InvestigationDraft,
     InvestigationFinding,
 )
-from aml_copilot.agents.revision import create_revision_node
-from aml_copilot.agents.state import InvestigationResult, InvestigationState
+from aml_copilot.agents.state import InvestigationResult
 from aml_copilot.agents.synthesis import synthesize_findings_from_response
 from aml_copilot.models.transaction import Transaction, TransactionStatement
 

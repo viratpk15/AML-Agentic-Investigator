@@ -9,7 +9,7 @@ Enforces strict factual grounding:
 """
 
 import re
-from typing import Any, Dict, List, Optional, Set
+from typing import Dict, List, Set
 from pydantic import BaseModel, Field
 
 from aml_copilot.models.evidence import CanonicalEvidence
@@ -97,6 +97,22 @@ def validate_report_evidence(
                 provenance_failures.append(msg)
             else:
                 verified_tids.add(tid)
+
+    # 2b. PHASE 8 QUALITY GATE: Validate RuleSummaryGroup severity invariant
+    #     finding_count == sum(severity_distribution.values()) for every group.
+    #     This is the canonical invariant that prevents HIGH:46 vs Total:25 bugs.
+    for rsg in getattr(report, "rule_summary_groups", []):
+        finding_ct = getattr(rsg, "finding_count", None)
+        sev_sum = sum(rsg.severity_distribution.values()) if rsg.severity_distribution else 0
+        if finding_ct is not None and finding_ct != sev_sum:
+            msg = (
+                f"Severity invariant violation for rule '{rsg.rule_id}': "
+                f"finding_count={finding_ct} but sum(severity_distribution)={sev_sum}. "
+                f"Severity distribution: {dict(rsg.severity_distribution)}. "
+                f"These must be equal — severity counts FINDINGS, not associated transactions."
+            )
+            errors.append(msg)
+            provenance_failures.append(msg)
 
     # 3. Validate Human Review items
     canonical_hr_ids = {item.transaction_id for item in canonical_evidence.human_review_items}
@@ -251,7 +267,29 @@ def validate_report_evidence(
         if matches:
             errors.append(f"Compliance safety violation ({desc}): Found prohibited assertion matching '{pattern}'.")
 
+    # 11b. PHASE 7 QUALITY GATE: Internal agent chatter must never appear in the final report.
+    # Check interpretation + executive summary (not section headers which contain allowed terms).
+    internal_chatter_patterns = [
+        (r"\bi\s+need\s+to\b", "Internal agent reasoning ('I need to')"),
+        (r"\blet\s+me\s+(?:verify|check|correct|review|think|analyze)\b", "Internal reasoning ('let me ...')"),
+        (r"\bcorrect\s+(?:my|the)\s+(?:previous|earlier|above)\b", "Internal revision discussion"),
+        (r"\bprevious\s+draft\b", "Internal revision reference"),
+        (r"\bcritic\s+(?:feedback|flagged|identified|noted|said|stated)\b", "Critic feedback in final report"),
+        (r"\brevision\s+cycle\s+\d\b", "Revision cycle internals exposed"),
+        (r"\btool\s+call\b", "Tool call reference in final report"),
+        (r"\bchain.of.thought\b", "Chain-of-thought exposed"),
+    ]
+    chatter_text = f"{report.interpretation} {report.executive_summary}"
+    for b in report.executive_summary_bullets:
+        chatter_text += f" {b}"
+    for chatter_pattern, chatter_desc in internal_chatter_patterns:
+        if re.search(chatter_pattern, chatter_text, flags=re.IGNORECASE):
+            msg = f"Internal chatter violation ({chatter_desc}): Final report contains internal workflow text."
+            errors.append(msg)
+            provenance_failures.append(msg)
+
     # 12. Validate text prose for ungrounded detection claims
+
     sentences = [s.strip() for s in re.split(r"[.\n]", all_report_text) if s.strip()]
     for s in sentences:
         s_tids = re.findall(r"\bTXN\d+\b", s)

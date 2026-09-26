@@ -1,6 +1,6 @@
 """Revision node incorporating structured Critic feedback into the investigation loop."""
 
-from typing import Any, Callable, Dict, List
+from typing import Any, Callable, Dict
 from langchain_core.messages import HumanMessage
 
 from aml_copilot.agents.state import InvestigationState, emit_investigation_event

@@ -15,7 +15,6 @@ Captures all required criteria:
 12. final investigation status
 """
 
-import json
 import sys
 import time
 from pathlib import Path
@@ -72,7 +71,7 @@ def main():
         print(f"  [{evt.event_type}] {evt.message[:95]}")
 
     # 2. Run Investigation Agent
-    print(f"\n[2] Executing Agent Investigation...")
+    print("\n[2] Executing Agent Investigation...")
     rag_service = RAGService(knowledge_dir="data/knowledge")
 
     start_t = time.time()
@@ -92,7 +91,7 @@ def main():
     print(f"\n    Investigation completed in {elapsed}s")
 
     # 3. Generate Evidence-Grounded Report
-    print(f"\n[3] Generating and Validating Report...")
+    print("\n[3] Generating and Validating Report...")
     canonical_ev = investigation.canonical_evidence
     report = generate_investigation_report(
         statement=statement,

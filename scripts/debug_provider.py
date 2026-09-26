@@ -4,6 +4,11 @@ import sys
 sys.path.insert(0, "src")
 
 from aml_copilot.config import get_settings
+from aml_copilot.llm.classifier import classify_provider_error
+from aml_copilot.llm.factory import LLMFactory
+from aml_copilot.llm.failover import FailoverLLM
+from langchain_core.messages import HumanMessage
+from langchain_groq import ChatGroq
 
 s = get_settings()
 print(f"LLM_PROVIDER: {s.llm_provider}")
@@ -15,9 +20,6 @@ print(f"GEMINI_MODEL: {s.gemini_model}")
 print()
 
 # Try building the FailoverLLM
-from aml_copilot.llm.factory import LLMFactory
-from aml_copilot.llm.failover import FailoverLLM
-
 factory = LLMFactory(settings=s)
 print("Primary config:", factory.primary_config())
 print("Fallback configs:", factory.fallback_configs())
@@ -28,10 +30,7 @@ print("FailoverLLM provider_names:", flm.provider_names)
 print()
 
 # Fire a minimal call to Groq and capture the raw exception
-from langchain_core.messages import HumanMessage
-
 try:
-    from langchain_groq import ChatGroq
     llm = ChatGroq(
         model=s.groq_model,
         temperature=0.0,
@@ -53,6 +52,5 @@ except Exception as exc:
     print(f"Groq body attr: {getattr(exc, 'body', 'NOT FOUND')}")
     print()
     # Run through classifier
-    from aml_copilot.llm.classifier import classify_provider_error
     classified = classify_provider_error(exc, "groq")
     print(f"Classified as: {type(classified).__name__} reason={getattr(classified, 'reason', 'N/A')}")

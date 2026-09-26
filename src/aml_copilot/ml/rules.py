@@ -1,12 +1,12 @@
 """Deterministic AML rule engine producing structured investigation signals."""
 
 import datetime as dt
-from typing import Dict, List, Optional
+from typing import List, Optional
 from pydantic import BaseModel, Field
 
 from aml_copilot.analysis.transaction_analytics import AnalyticsResult, analyze_transactions
 from aml_copilot.logger import get_logger
-from aml_copilot.models.findings import RuleSignal, SignalSeverity
+from aml_copilot.models.findings import RuleSignal, SignalSeverity, granularity_for_rule
 from aml_copilot.models.transaction import TransactionStatement
 
 logger = get_logger(__name__)
@@ -203,6 +203,7 @@ class RuleEngine:
                         rule_id="RULE_LARGE_TRANSACTION",
                         rule_name="Unusually Large Transaction",
                         transaction_ids=[txn_id],
+                        granularity=granularity_for_rule("RULE_LARGE_TRANSACTION"),
                         severity=severity,
                         explanation=explanation,
                         supporting_values=supporting,
@@ -249,6 +250,7 @@ class RuleEngine:
                         rule_id="RULE_SUDDEN_VOLUME_INCREASE",
                         rule_name="Sudden Transaction Volume Increase",
                         transaction_ids=day_txns,
+                        granularity=granularity_for_rule("RULE_SUDDEN_VOLUME_INCREASE"),
                         severity=SignalSeverity.MEDIUM,
                         explanation=explanation,
                         supporting_values=supporting,
@@ -306,6 +308,7 @@ class RuleEngine:
                         rule_id="RULE_LARGE_INFLOW_RAPID_OUTFLOW",
                         rule_name="Large Incoming Transaction Followed by Rapid Outgoing",
                         transaction_ids=involved_ids,
+                        granularity=granularity_for_rule("RULE_LARGE_INFLOW_RAPID_OUTFLOW"),
                         severity=SignalSeverity.HIGH,
                         explanation=explanation,
                         supporting_values=supporting,
@@ -354,6 +357,7 @@ class RuleEngine:
                             rule_id="RULE_RAPID_MOVEMENT_OF_FUNDS",
                             rule_name="Rapid Movement of Funds",
                             transaction_ids=txn_ids,
+                            granularity=granularity_for_rule("RULE_RAPID_MOVEMENT_OF_FUNDS"),
                             severity=SignalSeverity.HIGH if turnover >= 0.95 else SignalSeverity.MEDIUM,
                             explanation=explanation,
                             supporting_values=supporting,
@@ -390,6 +394,7 @@ class RuleEngine:
                     rule_id="RULE_MANY_NEW_COUNTERPARTIES",
                     rule_name="Many New Counterparties",
                     transaction_ids=txn_ids,
+                    granularity=granularity_for_rule("RULE_MANY_NEW_COUNTERPARTIES"),
                     severity=SignalSeverity.MEDIUM,
                     explanation=explanation,
                     supporting_values=supporting,
@@ -422,6 +427,7 @@ class RuleEngine:
                         rule_id="RULE_HIGH_TRANSACTION_FREQUENCY",
                         rule_name="Unusually High Transaction Frequency",
                         transaction_ids=day_txns,
+                        granularity=granularity_for_rule("RULE_HIGH_TRANSACTION_FREQUENCY"),
                         severity=SignalSeverity.LOW,
                         explanation=explanation,
                         supporting_values=supporting,
@@ -448,6 +454,7 @@ class RuleEngine:
                     rule_id="RULE_HIGH_STATEMENT_FREQUENCY",
                     rule_name="High Overall Statement Velocity",
                     transaction_ids=all_ids,
+                    granularity=granularity_for_rule("RULE_HIGH_STATEMENT_FREQUENCY"),
                     severity=SignalSeverity.LOW,
                     explanation=explanation,
                     supporting_values=supporting,

@@ -1,12 +1,11 @@
 """Network analysis engine constructing customer-counterparty graphs via NetworkX."""
 
 from collections import defaultdict
-import datetime as dt
 from typing import Any, Dict, List, Optional, Tuple
 import networkx as nx
 
 from aml_copilot.logger import get_logger
-from aml_copilot.models.transaction import Transaction, TransactionStatement
+from aml_copilot.models.transaction import TransactionStatement
 from aml_copilot.network.models import (
     NetworkAnalysisResult,
     NetworkEdge,

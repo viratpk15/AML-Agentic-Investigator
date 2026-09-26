@@ -18,13 +18,12 @@ Covers all 12 verification criteria:
 from pathlib import Path
 from typing import Any, List
 import pytest
-from langchain_core.messages import AIMessage, BaseMessage
+from langchain_core.messages import AIMessage
 
 from aml_copilot.agents.critic import evaluate_investigation_draft
 from aml_copilot.agents.graph import should_continue_investigator
 from aml_copilot.agents.investigation_agent import InvestigationAgent
 from aml_copilot.agents.state import (
-    InvestigationResult,
     InvestigationState,
     InvestigationStatus,
     ToolExecutionRecord,
@@ -37,7 +36,6 @@ from aml_copilot.events.models import EventType, InvestigationEvent
 from aml_copilot.models.evidence import (
     CanonicalEvidence,
     build_canonical_evidence,
-    select_human_review_items,
 )
 from aml_copilot.models.transaction import TransactionStatement
 from aml_copilot.reporting.generator import generate_investigation_report

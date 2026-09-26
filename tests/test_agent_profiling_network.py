@@ -4,7 +4,6 @@ import datetime as dt
 from typing import Any, List, Optional
 import uuid
 
-import pytest
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.messages import AIMessage, BaseMessage
 from langchain_core.outputs import ChatGeneration, ChatResult

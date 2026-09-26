@@ -20,7 +20,6 @@ import pytest
 
 from aml_copilot.agents.critic import evaluate_investigation_draft
 from aml_copilot.agents.state import InvestigationResult
-from aml_copilot.ml.pipeline import run_detection
 from aml_copilot.ml.rules import RuleConfig, RuleEngine
 from aml_copilot.models.evidence import (
     CanonicalEvidence,

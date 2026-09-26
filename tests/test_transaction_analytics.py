@@ -4,7 +4,7 @@ import datetime as dt
 from pathlib import Path
 import pytest
 
-from aml_copilot.analysis import AnalyticsResult, DailyVolume, analyze_transactions
+from aml_copilot.analysis import AnalyticsResult, analyze_transactions
 from aml_copilot.models.transaction import Transaction, TransactionStatement
 from aml_copilot.services.pdf_parser import extract_pdf_text
 from aml_copilot.services.transaction_parser import parse_transactions

@@ -27,14 +27,11 @@ from aml_copilot.agents.state import InvestigationResult
 from aml_copilot.exceptions import ReportReconciliationError
 from aml_copilot.models.evidence import (
     CanonicalEvidence,
-    CanonicalTransaction,
     build_canonical_evidence,
     reconcile_customer_profile,
 )
-from aml_copilot.models.transaction import Transaction, TransactionStatement
-from aml_copilot.reporting.formatter import format_report_markdown
+from aml_copilot.models.transaction import TransactionStatement
 from aml_copilot.reporting.generator import generate_investigation_report
-from aml_copilot.reporting.validation import validate_report_evidence
 from aml_copilot.services.pdf_parser import extract_pdf_text
 from aml_copilot.services.transaction_parser import parse_transactions
 

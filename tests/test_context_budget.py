@@ -1,21 +1,17 @@
 """Unit tests for Context Budgeting and Payload Optimization in AML Investigations."""
 
 import json
-from typing import Any, List, Optional
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
 import pytest
 
 from aml_copilot.agents.context_budget import (
-    ContextBudgetReport,
     compact_tool_output,
     estimate_tokens,
     prepare_context_for_llm,
 )
 from aml_copilot.agents.investigation_agent import (
     SYSTEM_PROMPT,
-    InvestigationAgent,
 )
-from aml_copilot.config import Settings
 from aml_copilot.models.transaction import Transaction, TransactionStatement
 
 

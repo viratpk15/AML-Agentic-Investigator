@@ -7,7 +7,6 @@ from typing import Any, Dict, List, Optional
 
 from aml_copilot.agents.state import InvestigationResult
 from aml_copilot.logger import get_logger
-from aml_copilot.ml.pipeline import run_detection
 from aml_copilot.models.evidence import (
     SIGNAL_DOMAINS,
     CanonicalEvidence,
@@ -16,10 +15,8 @@ from aml_copilot.models.evidence import (
 )
 from aml_copilot.models.findings import DetectionResult
 from aml_copilot.models.transaction import Transaction, TransactionStatement
-from aml_copilot.network.analysis import build_transaction_network
 from aml_copilot.network.models import NetworkAnalysisResult
 from aml_copilot.profiling.customer_profile import CustomerProfile
-from aml_copilot.profiling.profiler import build_customer_profile
 from aml_copilot.reporting.models import (
     AnomalyFindingItem,
     AnomalyFindingsSummary,
@@ -250,15 +247,28 @@ def generate_investigation_report(
         for rf in canonical_evidence.rule_findings
     ]
 
-    # Group rule findings by rule type to prevent repetitive narrative output
+    # Group rule findings by rule type to prevent repetitive narrative output.
+    #
+    # CANONICAL SEMANTICS ENFORCED:
+    # - Each CanonicalRuleFinding == 1 independent finding/event, regardless of granularity.
+    # - severity_distribution counts FINDINGS, not associated transactions.
+    #   INVARIANT: finding_count == sum(severity_distribution.values())
+    # - associated_transaction_count counts unique participating transactions
+    #   (>= finding_count for EVENT_LEVEL; == finding_count for TRANSACTION_LEVEL).
     rule_groups: Dict[str, Dict[str, Any]] = {}
     for rf in canonical_evidence.rule_findings:
+        gran = rf.granularity if isinstance(rf.granularity, str) else getattr(rf.granularity, "value", "EVENT_LEVEL")
         if rf.rule_id not in rule_groups:
             rule_groups[rf.rule_id] = {
                 "rule_id": rf.rule_id,
                 "rule_name": rf.rule_name,
+                "granularity": gran,
+                # tids accumulates all unique participating transaction IDs (for display)
                 "tids": list(rf.supporting_transaction_ids),
-                "severity_counts": {rf.severity: len(rf.supporting_transaction_ids) or 1},
+                # finding_count: each rf is exactly 1 independent finding/event
+                "finding_count": 1,
+                # severity_counts increments by 1 per finding, NEVER per transaction
+                "severity_counts": {rf.severity: 1},
                 "observations": [rf.observation],
             }
         else:
@@ -267,7 +277,9 @@ def generate_investigation_report(
                 if tid not in rg["tids"]:
                     rg["tids"].append(tid)
             sev = rf.severity
-            rg["severity_counts"][sev] = rg["severity_counts"].get(sev, 0) + (len(rf.supporting_transaction_ids) or 1)
+            rg["finding_count"] += 1
+            # Exactly +1 per finding — fixes the HIGH:46 vs Total:25 bug
+            rg["severity_counts"][sev] = rg["severity_counts"].get(sev, 0) + 1
             if len(rg["observations"]) < 3 and rf.observation not in rg["observations"]:
                 rg["observations"].append(rf.observation)
 
@@ -281,14 +293,19 @@ def generate_investigation_report(
                 rep_txns.append((tid, amt or 0.0, str(t.date), t.counterparty or "Unspecified"))
         rep_txns.sort(key=lambda x: x[1], reverse=True)
         rep_examples = [
-            f"`{tid}`: ₹{amt:,.2f} ({dt_str}, {cp})"
+            f"`{tid}`: \u20b9{amt:,.2f} ({dt_str}, {cp})"
             for tid, amt, dt_str, cp in rep_txns[:3]
         ]
+        finding_ct = data["finding_count"]
+        assoc_ct = len(data["tids"])
         rule_summary_groups.append(
             RuleSummaryGroup(
                 rule_id=data["rule_id"],
                 rule_name=data["rule_name"],
-                count=len(data["tids"]),
+                granularity=data["granularity"],
+                finding_count=finding_ct,
+                associated_transaction_count=assoc_ct,
+                count=assoc_ct,  # legacy alias
                 severity_distribution=data["severity_counts"],
                 supporting_transaction_ids=data["tids"],
                 representative_examples=rep_examples,

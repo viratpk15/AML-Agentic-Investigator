@@ -1,9 +1,7 @@
 """Integration tests for M18 real-time asynchronous endpoints and SSE streaming."""
 
-import asyncio
-import io
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 import pytest
 from fastapi.testclient import TestClient
 
@@ -82,11 +80,11 @@ def test_demo_async_investigation_and_sse_streaming(client):
                 break
 
     # Verify structured events were streamed
-    event_lines = [l for l in lines if l.startswith("data:")]
+    event_lines = [line for line in lines if line.startswith("data:")]
     assert len(event_lines) > 0
-    assert any("INVESTIGATION_STARTED" in l for l in event_lines)
-    assert any("CRITIC_PASSED" in l for l in event_lines)
-    assert any("INVESTIGATION_COMPLETED" in l for l in event_lines)
+    assert any("INVESTIGATION_STARTED" in line for line in event_lines)
+    assert any("CRITIC_PASSED" in line for line in event_lines)
+    assert any("INVESTIGATION_COMPLETED" in line for line in event_lines)
 
     # Query status endpoint
     status_res = client.get(f"/investigations/{inv_id}")
@@ -183,10 +181,10 @@ def test_start_investigation_mocked_e2e_streaming(client):
                 if "INVESTIGATION_COMPLETED" in line:
                     break
 
-        event_lines = [l for l in lines if l.startswith("data:")]
-        assert any("INVESTIGATION_STARTED" in l for l in event_lines)
-        assert any("CRITIC_PASSED" in l for l in event_lines)
-        assert any("INVESTIGATION_COMPLETED" in l for l in event_lines)
+        event_lines = [line for line in lines if line.startswith("data:")]
+        assert any("INVESTIGATION_STARTED" in line for line in event_lines)
+        assert any("CRITIC_PASSED" in line for line in event_lines)
+        assert any("INVESTIGATION_COMPLETED" in line for line in event_lines)
 
         # Verify completed status
         status_res = client.get(f"/investigations/{inv_id}")
@@ -278,13 +276,13 @@ def test_critic_failure_and_revision_events_streamed(client):
         inv_id = start_res.json()["investigation_id"]
 
         with client.stream("GET", f"/investigations/{inv_id}/events") as sse_res:
-            lines = [l for l in sse_res.iter_lines() if l]
+            lines = [line for line in sse_res.iter_lines() if line]
 
-        event_lines = [l for l in lines if l.startswith("data:")]
-        assert any("CRITIC_FAILED" in l for l in event_lines)
-        assert any("Non-existent transaction TXN999 cited" in l for l in event_lines)
-        assert any("REVISION_STARTED" in l for l in event_lines)
-        assert any("CRITIC_PASSED" in l for l in event_lines)
+        event_lines = [line for line in lines if line.startswith("data:")]
+        assert any("CRITIC_FAILED" in line for line in event_lines)
+        assert any("Non-existent transaction TXN999 cited" in line for line in event_lines)
+        assert any("REVISION_STARTED" in line for line in event_lines)
+        assert any("CRITIC_PASSED" in line for line in event_lines)
 
 
 def test_investigation_failure_event_handling(client):
@@ -307,11 +305,11 @@ def test_investigation_failure_event_handling(client):
         inv_id = start_res.json()["investigation_id"]
 
         with client.stream("GET", f"/investigations/{inv_id}/events") as sse_res:
-            lines = [l for l in sse_res.iter_lines() if l]
+            lines = [line for line in sse_res.iter_lines() if line]
 
-        event_lines = [l for l in lines if l.startswith("data:")]
-        assert any("INVESTIGATION_FAILED" in l for l in event_lines)
-        assert any("OpenAI rate limit exceeded" in l for l in event_lines)
+        event_lines = [line for line in lines if line.startswith("data:")]
+        assert any("INVESTIGATION_FAILED" in line for line in event_lines)
+        assert any("OpenAI rate limit exceeded" in line for line in event_lines)
 
         status_res = client.get(f"/investigations/{inv_id}")
         assert status_res.status_code == 200

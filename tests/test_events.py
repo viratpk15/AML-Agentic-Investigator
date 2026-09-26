@@ -1,7 +1,6 @@
 """Unit tests for the real-time Investigation Event models and EventBus."""
 
 import asyncio
-import pytest
 
 from aml_copilot.events.bus import InvestigationEventBus, InvestigationEventManager
 from aml_copilot.events.models import EventType, InvestigationEvent

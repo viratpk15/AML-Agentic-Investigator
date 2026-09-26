@@ -4,14 +4,15 @@ import sys
 sys.path.insert(0, "src")
 
 from aml_copilot.config import get_settings
-from langchain_core.messages import HumanMessage, SystemMessage
+from aml_copilot.llm.classifier import classify_provider_error
+from langchain_core.messages import HumanMessage
+from langchain_groq import ChatGroq
 
 s = get_settings()
 
 # Build a payload large enough to exceed Groq's 8000 TPM limit
 big_content = "Analyse this transaction data: " + ("suspicious UPI transfer " * 600)
 
-from langchain_groq import ChatGroq
 llm = ChatGroq(
     model=s.groq_model,
     temperature=0.0,
@@ -40,7 +41,6 @@ except Exception as exc:
         print(f"  body: {str(body)[:300]}")
 
     # What does our classifier make of it?
-    from aml_copilot.llm.classifier import classify_provider_error
     classified = classify_provider_error(exc, "groq")
     print()
     print(f"Classifier output: {type(classified).__name__}")

@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field
 
 from aml_copilot.analysis.transaction_analytics import AnalyticsResult, analyze_transactions
 from aml_copilot.logger import get_logger
-from aml_copilot.models.transaction import Transaction, TransactionStatement
+from aml_copilot.models.transaction import TransactionStatement
 
 logger = get_logger(__name__)
 

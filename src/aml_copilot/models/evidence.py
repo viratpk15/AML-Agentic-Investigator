@@ -12,8 +12,8 @@ Serves as the single source of truth for all investigation evidence:
 from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, Field
 
-from aml_copilot.models.findings import DetectionResult
-from aml_copilot.models.transaction import Transaction, TransactionStatement
+from aml_copilot.models.findings import DetectionResult, granularity_for_rule
+from aml_copilot.models.transaction import TransactionStatement
 from aml_copilot.network.models import NetworkAnalysisResult
 from aml_copilot.profiling.customer_profile import CustomerProfile
 
@@ -37,11 +37,20 @@ class CanonicalTransaction(BaseModel):
 
 
 class CanonicalRuleFinding(BaseModel):
-    """Factual finding from a deterministic rule engine trigger."""
+    """Factual finding from a deterministic rule engine trigger.
+
+    Semantic contract:
+    - One CanonicalRuleFinding == one independent rule event (or one transaction if TRANSACTION_LEVEL).
+    - supporting_transaction_ids are participants in that event, not extra findings.
+    """
 
     finding_id: str = Field(..., description="Unique deterministic identifier for the finding")
     rule_id: str = Field(..., description="Programmatic identifier of the detection rule")
     rule_name: str = Field(..., description="Human-readable rule title")
+    granularity: str = Field(
+        default="EVENT_LEVEL",
+        description="TRANSACTION_LEVEL or EVENT_LEVEL canonical finding unit",
+    )
     severity: str = Field(default="MEDIUM", description="Assigned severity (INFO, LOW, MEDIUM, HIGH)")
     observation: str = Field(..., description="Factual description of the triggered condition")
     evidence: str = Field(default="", description="Factual evidence string")
@@ -506,11 +515,19 @@ def build_canonical_evidence(
                 flagged_ids_set.add(tid)
 
             finding_id = f"FINDING-RULE-{idx + 1:03d}-{rs.rule_id}"
+            gran = getattr(rs, "granularity", None)
+            if gran is not None and hasattr(gran, "value"):
+                gran_value = gran.value
+            elif gran:
+                gran_value = str(gran)
+            else:
+                gran_value = granularity_for_rule(rs.rule_id).value
             rule_findings.append(
                 CanonicalRuleFinding(
                     finding_id=finding_id,
                     rule_id=rs.rule_id,
                     rule_name=rs.rule_name,
+                    granularity=gran_value,
                     severity=rs.severity.value if hasattr(rs.severity, "value") else str(rs.severity),
                     observation=rs.explanation,
                     supporting_transaction_ids=verified_tids,
@@ -649,7 +666,7 @@ def build_canonical_evidence(
 def reconcile_customer_profile(
     profile: Optional[CanonicalProfile],
     canonical_transactions: List[CanonicalTransaction],
-) -> None:
+) -> bool:
     """Enforce strict mathematical reconciliation invariants between customer profile and canonical transactions.
 
     Invariants:
@@ -667,7 +684,7 @@ def reconcile_customer_profile(
     from aml_copilot.exceptions import ReportReconciliationError
 
     if profile is None or not canonical_transactions:
-        return
+        return True
 
     txns = canonical_transactions
 
@@ -731,4 +748,3 @@ def reconcile_customer_profile(
             )
 
     return True
-

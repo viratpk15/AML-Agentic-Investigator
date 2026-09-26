@@ -11,12 +11,11 @@ while strictly preserving:
 import json
 import math
 import re
-from typing import Any, Dict, List, Optional, Sequence, Tuple
+from typing import Any, List, Optional, Sequence, Tuple
 from langchain_core.messages import (
     AIMessage,
     BaseMessage,
     HumanMessage,
-    SystemMessage,
     ToolMessage,
 )
 from pydantic import BaseModel, Field
@@ -237,7 +236,7 @@ def compact_tool_output(tool_name: str, output: Any) -> str:
 
 
 def prepare_context_for_llm(
-    messages: List[BaseMessage],
+    messages: Sequence[BaseMessage],
     max_tokens: int = 6000,
     tools: Optional[Sequence[Any]] = None,
 ) -> Tuple[List[BaseMessage], ContextBudgetReport]:
@@ -266,7 +265,7 @@ def prepare_context_for_llm(
             f"context_estimated_tokens={report.final_estimated_tokens} "
             f"context_reduction_applied=false"
         )
-        return messages, report
+        return list(messages), report
 
     # Needs reduction
     stages_applied: List[str] = []

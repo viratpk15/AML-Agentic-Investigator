@@ -10,10 +10,7 @@ from aml_copilot.models.transaction import Transaction, TransactionStatement
 from aml_copilot.reporting.formatter import format_report_json, format_report_markdown
 from aml_copilot.reporting.generator import generate_investigation_report
 from aml_copilot.reporting.models import (
-    CriticSummary,
-    EvidenceItem,
     InvestigationReport,
-    RevisionSummary,
 )
 
 

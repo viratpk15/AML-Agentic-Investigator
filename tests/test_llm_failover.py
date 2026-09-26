@@ -25,8 +25,7 @@ Covers:
 
 from __future__ import annotations
 
-import re
-from typing import Any, List, Optional
+from typing import Optional
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -40,7 +39,7 @@ from aml_copilot.llm.exceptions import (
     ProviderRetryableError,
 )
 from aml_copilot.llm.failover import FailoverLLM
-from aml_copilot.llm.factory import LLMFactory, build_chat_model
+from aml_copilot.llm.factory import LLMFactory
 from aml_copilot.llm.models import ProviderConfig
 
 

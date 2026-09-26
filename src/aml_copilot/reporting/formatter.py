@@ -1,6 +1,5 @@
-import json
 import re
-from typing import Any, Dict, List
+from typing import List
 from aml_copilot.reporting.models import InvestigationReport
 
 
@@ -109,13 +108,23 @@ def format_report_markdown(report: InvestigationReport) -> str:
             if len(rsg.supporting_transaction_ids) > 10:
                 txns_preview += f" ... (+{len(rsg.supporting_transaction_ids) - 10} more)"
             lines.append(f"- **{rsg.rule_name}** (`{rsg.rule_id}`)")
-            lines.append(f"  - **Total Triggered**: {rsg.count} instance(s) ({sev_str})")
+            # Render canonical finding count with correct semantics per granularity
+            gran = getattr(rsg, "granularity", "EVENT_LEVEL")
+            finding_ct = getattr(rsg, "finding_count", rsg.count)
+            assoc_ct = getattr(rsg, "associated_transaction_count", rsg.count)
+            if gran == "TRANSACTION_LEVEL":
+                lines.append(f"  - **Total Triggered**: {finding_ct} transaction(s) ({sev_str})")
+            else:
+                # EVENT_LEVEL: show finding count; show associated transactions separately
+                assoc_note = f" | {assoc_ct} associated transaction(s)" if assoc_ct != finding_ct else ""
+                lines.append(f"  - **Total Triggered**: {finding_ct} event(s) ({sev_str}){assoc_note}")
             if rsg.observation_summary:
                 lines.append(f"  - **Condition Summary**: {rsg.observation_summary}")
             if rsg.representative_examples:
                 lines.append(f"  - **Representative Examples**: {', '.join(rsg.representative_examples)}")
             lines.append(f"  - **Supporting Transactions**: {txns_preview}")
         lines.append("")
+
     elif report.detection_findings:
         for df in report.detection_findings:
             txns_str = ", ".join(f"`{t}`" for t in df.supporting_transaction_ids) if df.supporting_transaction_ids else "None"

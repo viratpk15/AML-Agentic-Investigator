@@ -83,7 +83,11 @@ def synthesize_findings_from_response(
         sections = re.split(r"\n(?=[A-Z][a-zA-Z\s]+:)", raw_response)
         for sec in sections:
             if sec.startswith("Observed Evidence:"):
-                lines = [l.strip("- ") for l in sec.replace("Observed Evidence:", "").strip().split("\n") if l.strip()]
+                lines = [
+                    line_item.strip("- ")
+                    for line_item in sec.replace("Observed Evidence:", "").strip().split("\n")
+                    if line_item.strip()
+                ]
                 for line in lines:
                     if line and line not in observed_evidence:
                         observed_evidence.append(line)

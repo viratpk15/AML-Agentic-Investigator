@@ -517,7 +517,7 @@ def parse_transactions(extraction: PDFDocumentExtraction) -> TransactionStatemen
     customer_name, account_number, statement_period = extract_metadata(all_lines)
 
     # Filter out running page headers, page numbers, and repeated table column headers
-    cleaned_lines = [l for l in all_lines if not is_header_or_footer(l)]
+    cleaned_lines = [line for line in all_lines if not is_header_or_footer(line)]
 
     # Locate row start boundaries:
     # 1. Line is a Txn ID followed by a Date (Txn ID-first layout)

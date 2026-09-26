@@ -10,7 +10,6 @@ from langchain_core.messages import AIMessage, BaseMessage
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.outputs import ChatGeneration, ChatResult
 
-from aml_copilot.agents.graph import build_investigation_graph
 from aml_copilot.agents.investigation_agent import InvestigationAgent, run_investigation
 from aml_copilot.models.transaction import Transaction, TransactionStatement
 from aml_copilot.rag.documents import (
@@ -19,14 +18,13 @@ from aml_copilot.rag.documents import (
     chunk_document,
     load_knowledge_documents,
 )
-from aml_copilot.rag.embeddings import DeterministicLocalEmbedder, get_embedding_service
+from aml_copilot.rag.embeddings import DeterministicLocalEmbedder
 from aml_copilot.rag.retriever import AMLKnowledgeRetriever
 from aml_copilot.rag.service import RAGService, get_rag_service
 from aml_copilot.rag.vector_store import LocalVectorStore
 from aml_copilot.tools.rag_tools import (
     SearchAMLKnowledgeInput,
     create_search_aml_knowledge_tool,
-    execute_search_aml_knowledge,
 )
 from aml_copilot.tools.tool_registry import ToolRegistry
 

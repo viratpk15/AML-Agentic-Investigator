@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field
 
 from aml_copilot.logger import get_logger
 from aml_copilot.ml.pipeline import run_detection
-from aml_copilot.models.findings import DetectionResult, SignalSeverity
+from aml_copilot.models.findings import DetectionResult
 from aml_copilot.models.transaction import TransactionStatement
 
 logger = get_logger(__name__)

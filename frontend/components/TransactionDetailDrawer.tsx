@@ -37,13 +37,15 @@ export default function TransactionDetailDrawer({
       return;
     }
 
+    const currentReport = report;
+    const currentTxnId = transactionId;
     let isMounted = true;
     setLoading(true);
 
     // Attempt to fetch from backend or build deterministically from local report
     async function load() {
       try {
-        const data = await fetchTransactionEvidence(report!.report_id, transactionId!);
+        const data = await fetchTransactionEvidence(currentReport.report_id, currentTxnId);
         if (isMounted) {
           setDossier(data);
           setLoading(false);
@@ -51,33 +53,33 @@ export default function TransactionDetailDrawer({
       } catch (err) {
         // Deterministic fallback from report
         if (!isMounted) return;
-        const ev = report!.observed_evidence.find((e) => e.transaction_id === transactionId);
-        const anom = report!.anomaly_findings.find((a) => a.transaction_id === transactionId);
-        const rules = report!.detection_findings
-          .filter((r) => r.supporting_transaction_ids.includes(transactionId!))
+        const ev = (currentReport.observed_evidence || []).find((e) => e.transaction_id === currentTxnId);
+        const anom = (currentReport.anomaly_findings || []).find((a) => a.transaction_id === currentTxnId);
+        const rules = (currentReport.detection_findings || [])
+          .filter((r) => (r.supporting_transaction_ids || []).includes(currentTxnId))
           .map((r) => ({
             rule_id: r.rule_id,
             rule_name: r.rule_name,
             severity: r.severity,
             explanation: r.explanation,
-            supporting_values: r.supporting_values,
+            supporting_values: r.supporting_values || {},
           }));
-        const net = report!.network_findings
+        const net = (currentReport.network_findings || [])
           .filter(
             (n) =>
-              n.supporting_transaction_ids.includes(transactionId!) ||
-              (ev?.counterparty && n.involved_nodes.includes(ev.counterparty))
+              (n.supporting_transaction_ids || []).includes(currentTxnId) ||
+              (ev?.counterparty && (n.involved_nodes || []).includes(ev.counterparty))
           )
           .map((n) => ({
             pattern_name: n.pattern_name,
             description: n.description,
-            involved_nodes: n.involved_nodes,
+            involved_nodes: n.involved_nodes || [],
           }));
-        const hr = report!.human_review_items?.find((h) => h.transaction_id === transactionId);
-        const conv = report!.evidence_convergence?.find((c) => c.transaction_id === transactionId);
+        const hr = (currentReport.human_review_items || []).find((h) => h.transaction_id === currentTxnId);
+        const conv = (currentReport.evidence_convergence || []).find((c) => c.transaction_id === currentTxnId);
 
         setDossier({
-          transaction_id: transactionId!,
+          transaction_id: currentTxnId,
           date: ev?.date || null,
           amount: ev?.amount || null,
           flow_type: ev?.flow_type || null,
@@ -93,7 +95,7 @@ export default function TransactionDetailDrawer({
           human_review_reasons: hr?.reasons || conv?.reasons || [],
           evidence_convergence_summary: conv?.convergence_summary || hr?.evidence_summary || null,
           signal_domains: conv?.signal_domains || [],
-          related_rag_guidance: (report!.aml_reference_context || []).map((k) => ({
+          related_rag_guidance: (currentReport.aml_reference_context || []).map((k) => ({
             source: k.source,
             guidance: k.snippet || "Reference compliance guidance.",
           })),
@@ -229,7 +231,7 @@ export default function TransactionDetailDrawer({
                   <span>DETERMINISTIC FLAGGING RATIONALE</span>
                 </div>
                 <div className="space-y-2 text-xs">
-                  {dossier.rules_triggered.map((r, i) => (
+                  {(dossier.rules_triggered || []).map((r, i) => (
                     <div key={i} className="flex items-start space-x-2 text-gray-200">
                       <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
                       <div>
@@ -249,7 +251,7 @@ export default function TransactionDetailDrawer({
                       </div>
                     </div>
                   )}
-                  {dossier.network_patterns.map((n, i) => (
+                  {(dossier.network_patterns || []).map((n, i) => (
                     <div key={i} className="flex items-start space-x-2 text-gray-200">
                       <CheckCircle2 className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
                       <div>
@@ -258,9 +260,9 @@ export default function TransactionDetailDrawer({
                       </div>
                     </div>
                   ))}
-                  {dossier.rules_triggered.length === 0 &&
+                  {(dossier.rules_triggered || []).length === 0 &&
                     !dossier.is_anomaly &&
-                    dossier.network_patterns.length === 0 && (
+                    (dossier.network_patterns || []).length === 0 && (
                       <p className="text-gray-400 italic">
                         Standard transactional activity conforming to baseline behavior.
                       </p>
@@ -277,9 +279,9 @@ export default function TransactionDetailDrawer({
                   <p className="text-xs text-gray-300 leading-relaxed font-sans">
                     {dossier.evidence_convergence_summary}
                   </p>
-                  {dossier.signal_domains.length > 0 && (
+                  {(dossier.signal_domains || []).length > 0 && (
                     <div className="flex flex-wrap gap-1.5 pt-1">
-                      {dossier.signal_domains.map((dom, i) => (
+                      {(dossier.signal_domains || []).map((dom, i) => (
                         <span
                           key={i}
                           className="px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-white/5 border border-white/10 text-cyan-300"
@@ -293,14 +295,14 @@ export default function TransactionDetailDrawer({
               )}
 
               {/* Statistical Anomaly Features */}
-              {dossier.is_anomaly && Object.keys(dossier.anomaly_features).length > 0 && (
+              {dossier.is_anomaly && Object.keys(dossier.anomaly_features || {}).length > 0 && (
                 <div className="p-4 rounded-xl bg-surface/70 border border-white/5 space-y-2">
                   <div className="text-xs font-mono font-bold text-purple-400 flex items-center space-x-2">
                     <Activity className="w-4 h-4" />
                     <span>ML OUTLIER FEATURE VECTORS</span>
                   </div>
                   <div className="grid grid-cols-2 gap-2 text-xs font-mono">
-                    {Object.entries(dossier.anomaly_features).map(([feat, val]) => (
+                    {Object.entries(dossier.anomaly_features || {}).map(([feat, val]) => (
                       <div
                         key={feat}
                         className="p-2 rounded bg-black/40 border border-white/5 flex justify-between"
@@ -314,18 +316,18 @@ export default function TransactionDetailDrawer({
               )}
 
               {/* Network Topology Context */}
-              {dossier.network_patterns.length > 0 && (
+              {(dossier.network_patterns || []).length > 0 && (
                 <div className="p-4 rounded-xl bg-surface/70 border border-white/5 space-y-2">
                   <div className="text-xs font-mono font-bold text-amber-400 flex items-center space-x-2">
                     <Network className="w-4 h-4" />
                     <span>RELATIONAL NETWORK CONTEXT</span>
                   </div>
-                  {dossier.network_patterns.map((np, i) => (
+                  {(dossier.network_patterns || []).map((np, i) => (
                     <div key={i} className="text-xs space-y-1">
                       <div className="text-white font-semibold font-mono">{np.pattern_name}</div>
                       <div className="text-gray-400">{np.description}</div>
                       <div className="text-[11px] text-gray-500 font-mono">
-                        Entities: {np.involved_nodes.join(" ↔ ")}
+                        Entities: {(np.involved_nodes || []).join(" ↔ ")}
                       </div>
                     </div>
                   ))}
@@ -339,7 +341,7 @@ export default function TransactionDetailDrawer({
                   <span>AML REFERENCE KNOWLEDGE BASE GUIDANCE</span>
                 </div>
                 <div className="space-y-2 text-xs">
-                  {dossier.related_rag_guidance.slice(0, 2).map((rg, i) => (
+                  {(dossier.related_rag_guidance || []).slice(0, 2).map((rg, i) => (
                     <div key={i} className="p-2.5 rounded bg-black/40 border border-white/5 space-y-1">
                       <div className="font-mono text-[11px] text-cyan-300 font-bold flex items-center justify-between">
                         <span>{rg.source}</span>

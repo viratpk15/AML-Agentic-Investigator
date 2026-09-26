@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 """Check what _ChatModelBinding._generate does and how to call it properly."""
+import os
 import sys
 sys.path.insert(0, "src")
 
-from langchain_groq import ChatGroq
+from langchain_core.messages import HumanMessage
 from langchain_core.tools import tool
+from langchain_groq import ChatGroq
 
 @tool
 def dummy(query: str) -> str:
@@ -12,7 +14,6 @@ def dummy(query: str) -> str:
     return query
 
 # Check what bind_tools returns
-import os
 key = os.environ.get("GROQ_API_KEY", "")
 llm = ChatGroq(model="openai/gpt-oss-120b", temperature=0.0, api_key=key)
 bound = llm.bind_tools([dummy])
@@ -24,7 +25,6 @@ print("Has invoke:", hasattr(bound, "invoke"))
 
 # Does _generate exist?
 if hasattr(bound, "_generate"):
-    import inspect
     print("_generate defined in:", type(bound).__name__)
     try:
         src_class = [c for c in type(bound).__mro__ if "_generate" in c.__dict__]
@@ -33,7 +33,6 @@ if hasattr(bound, "_generate"):
         pass
 
 # What does invoke call internally?
-from langchain_core.messages import HumanMessage
 msgs = [HumanMessage(content="Hello")]
 
 # Try calling _generate directly on the bound model

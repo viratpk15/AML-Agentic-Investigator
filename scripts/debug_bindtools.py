@@ -4,15 +4,15 @@ import sys
 sys.path.insert(0, "src")
 
 from aml_copilot.config import get_settings
+from aml_copilot.llm.classifier import classify_provider_error
+from aml_copilot.llm.factory import LLMFactory
+from aml_copilot.llm.failover import FailoverLLM
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_core.tools import tool
 
 s = get_settings()
 
 # Build FailoverLLM
-from aml_copilot.llm.factory import LLMFactory
-from aml_copilot.llm.failover import FailoverLLM
-
 factory = LLMFactory(settings=s)
 flm = FailoverLLM.from_factory(factory=factory)
 print("Providers before bind:", flm.provider_names)
@@ -34,7 +34,7 @@ try:
     result = bound._generate(msgs)
     print("SUCCESS:", result.generations[0].message.content[:200])
 except Exception as exc:
-    print(f"\nFAILED:")
+    print("\nFAILED:")
     print(f"  TYPE: {type(exc).__name__}")
     print(f"  MRO: {[c.__name__ for c in type(exc).__mro__]}")
     print(f"  str: {str(exc)[:600]}")
@@ -42,8 +42,6 @@ except Exception as exc:
     resp = getattr(exc, 'response', None)
     if resp:
         print(f"  response.status_code: {getattr(resp, 'status_code', '---')}")
-    
-    from aml_copilot.llm.classifier import classify_provider_error
     classified = classify_provider_error(exc, "groq")
     print(f"\nClassifier: {type(classified).__name__} reason={getattr(classified, 'reason', 'N/A')}")
 

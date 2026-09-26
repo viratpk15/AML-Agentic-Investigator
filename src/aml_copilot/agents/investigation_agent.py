@@ -1,17 +1,14 @@
 """First single tool-using AML investigation agent orchestrated via LangGraph."""
 
-import re
-from typing import Any, Dict, List, Optional, cast
+from typing import Any, List, Optional, cast
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
 
 from aml_copilot.agents.graph import build_investigation_graph
 from aml_copilot.agents.state import (
-    InvestigationRequest,
     InvestigationResult,
     InvestigationState,
     InvestigationStatus,
-    ToolExecutionRecord,
 )
 from aml_copilot.config import Settings, get_settings
 from aml_copilot.exceptions import AgentConfigurationError

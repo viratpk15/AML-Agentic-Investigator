@@ -1,11 +1,9 @@
 """Unit and integration tests for FastAPI backend endpoints."""
 
-import io
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 import pytest
 from fastapi.testclient import TestClient
-from langchain_core.messages import AIMessage
 
 from aml_copilot.agents.models import CritiqueResult
 from aml_copilot.agents.state import InvestigationResult
@@ -195,7 +193,7 @@ def test_history_and_download_endpoints():
     assert isinstance(hist_res.json(), list)
 
     # Test dossier for a known transaction (TXN401)
-    dossier_res = client.get(f"/investigations/{report_id}/transactions/TXN401")
+    _ = client.get(f"/investigations/{report_id}/transactions/TXN401")
     # If not saved yet in history, test saving then fetching
     from aml_copilot.services.history import get_history_service
     from aml_copilot.reporting.models import InvestigationReport

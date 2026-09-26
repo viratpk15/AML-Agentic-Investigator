@@ -1,6 +1,5 @@
 """Unit tests for configuration management."""
 
-import pytest
 from aml_copilot.config import Settings, get_settings
 
 
