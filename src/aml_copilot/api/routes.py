@@ -530,6 +530,33 @@ async def _run_demo_async_investigation(
 # ---------------------------------------------------------------------------
 
 @router.get(
+    "/",
+    summary="Root API status and entry point",
+    tags=["System"],
+)
+@router.head(
+    "/",
+    include_in_schema=False,
+)
+async def root_status() -> dict[str, str]:
+    """Return operational metadata and documentation links for the API."""
+    return {
+        "service": "AML Investigation Copilot API",
+        "status": "online",
+        "version": "0.1.0",
+        "docs_url": "/docs",
+        "redoc_url": "/redoc",
+        "health_url": "/health",
+    }
+
+
+@router.get("/favicon.ico", include_in_schema=False)
+async def favicon() -> Response:
+    """Handle browser favicon request cleanly with 204 No Content."""
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.get(
     "/health",
     response_model=HealthResponse,
     summary="Health check endpoint",

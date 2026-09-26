@@ -6,6 +6,7 @@ services:
     plan: free
     buildCommand: "pip install --upgrade pip && pip install -r requirements.txt"
     startCommand: "uvicorn aml_copilot.api.main:app --host 0.0.0.0 --port $PORT"
+    healthCheckPath: /health
     envVars:
       - key: PYTHON_VERSION
         value: 3.12.0
@@ -15,7 +16,13 @@ services:
         value: INFO
       - key: LLM_PROVIDER
         value: groq
+      - key: LLM_FALLBACK_PROVIDERS
+        value: "nvidia,openrouter"
       - key: GROQ_API_KEY
+        sync: false
+      - key: NVIDIA_API_KEY
+        sync: false
+      - key: OPENROUTER_API_KEY
         sync: false
       - key: GEMINI_API_KEY
         sync: false

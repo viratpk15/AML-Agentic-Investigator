@@ -12,6 +12,23 @@ from aml_copilot.api.main import app
 client = TestClient(app)
 
 
+def test_root_endpoint():
+    """Verify GET and HEAD on / and /api return 200 OK with API status and links."""
+    for path in ["/", "/api"]:
+        get_res = client.get(path)
+        assert get_res.status_code == 200
+        data = get_res.json()
+        assert data["service"] == "AML Investigation Copilot API"
+        assert data["status"] == "online"
+        assert "docs_url" in data
+
+        head_res = client.head(path)
+        assert head_res.status_code == 200
+
+    favicon_res = client.get("/favicon.ico")
+    assert favicon_res.status_code == 204
+
+
 def test_health_check_endpoint():
     """Verify GET /health and GET /api/health return operational status."""
     for path in ["/health", "/api/health"]:
