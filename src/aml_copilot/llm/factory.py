@@ -149,16 +149,23 @@ def _build_nvidia(config: ProviderConfig) -> BaseChatModel:
         raise AgentConfigurationError(
             "NVIDIA API key not configured. Set NVIDIA_API_KEY in .env or environment."
         )
+    model_name = config.model
+    if model_name in ("meta/llama-3.3-70b-instruct", "meta/llama3-70b-instruct", "meta/llama-3.3-70b"):
+        logger.warning(
+            f"[LLM Factory] NVIDIA model '{model_name}' has reached EOL (HTTP 410). "
+            "Auto-switching to active model 'meta/llama-3.2-11b-vision-instruct'."
+        )
+        model_name = "meta/llama-3.2-11b-vision-instruct"
     try:
         from langchain_openai import ChatOpenAI  # type: ignore
 
         model = ChatOpenAI(
-            model=config.model,
+            model=model_name,
             temperature=config.temperature,
             api_key=config.api_key,
             base_url=config.base_url or "https://integrate.api.nvidia.com/v1",
         )
-        logger.info(f"[LLM Factory] Initialized ChatOpenAI (NVIDIA) with model '{config.model}'")
+        logger.info(f"[LLM Factory] Initialized ChatOpenAI (NVIDIA) with model '{model_name}'")
         return model
     except ImportError:
         raise AgentConfigurationError("langchain-openai is not installed.")
@@ -237,9 +244,12 @@ class LLMFactory:
                 base_url=s.openrouter_base_url,
             )
         if name == "nvidia":
+            nv_model = s.nvidia_model
+            if nv_model in ("meta/llama-3.3-70b-instruct", "meta/llama3-70b-instruct", "meta/llama-3.3-70b"):
+                nv_model = "meta/llama-3.2-11b-vision-instruct"
             return ProviderConfig(
                 name="nvidia",
-                model=s.nvidia_model,
+                model=nv_model,
                 api_key=s.nvidia_api_key,
                 temperature=s.llm_temperature,
                 max_context_tokens=s.nvidia_max_context_tokens,
