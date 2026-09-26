@@ -108,11 +108,20 @@ Isolation Forest Outliers   (Turnover / Ratios)      Graph & Topology         (V
 ### Environment Variables
 Create a `.env` file in the project root:
 ```env
-# Primary LLM Provider
+# LLM Provider Configuration
+LLM_PROVIDER="groq"
+LLM_FALLBACK_PROVIDERS="openrouter,nvidia"
+
+# Primary LLM Provider (Groq)
 GROQ_API_KEY=your_groq_api_key_here
 
-# Fallback LLM Provider (Optional / Recommended)
+# Fallback LLM Provider 1 (OpenRouter)
 OPENROUTER_API_KEY=your_openrouter_api_key_here
+
+# Fallback LLM Provider 2 (NVIDIA NIM / build.nvidia.com)
+NVIDIA_API_KEY=your_nvidia_api_key_here
+NVIDIA_MODEL="meta/llama-3.3-70b-instruct"
+NVIDIA_BASE_URL="https://integrate.api.nvidia.com/v1"
 
 # Application Configuration
 AML_ENVIRONMENT=production

@@ -23,6 +23,7 @@ class ProviderConfig:
     max_context_tokens: int = 6000
     max_iterations: int = 5
 
+    base_url: Optional[str] = None
     _api_key: Optional[str] = field(default=None, repr=False)
 
     def __init__(
@@ -33,6 +34,7 @@ class ProviderConfig:
         temperature: float = 0.0,
         max_context_tokens: int = 6000,
         max_iterations: int = 5,
+        base_url: Optional[str] = None,
     ) -> None:
         self.name = name
         self.model = model
@@ -40,6 +42,7 @@ class ProviderConfig:
         self.temperature = temperature
         self.max_context_tokens = max_context_tokens
         self.max_iterations = max_iterations
+        self.base_url = base_url
 
     @property
     def api_key(self) -> Optional[str]:

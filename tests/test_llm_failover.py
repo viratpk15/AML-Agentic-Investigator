@@ -83,6 +83,14 @@ def _openai_config(model: str = "gpt-4o-mini") -> ProviderConfig:
     return ProviderConfig(name="openai", model=model, api_key="sk-fake", max_context_tokens=6000)
 
 
+def _openrouter_config(model: str = "qwen/qwen3.8-27b:free") -> ProviderConfig:
+    return ProviderConfig(name="openrouter", model=model, api_key="sk-or-fake", max_context_tokens=12000, base_url="https://openrouter.ai/api/v1")
+
+
+def _nvidia_config(model: str = "meta/llama-3.3-70b-instruct") -> ProviderConfig:
+    return ProviderConfig(name="nvidia", model=model, api_key="nvapi-fake", max_context_tokens=12000, base_url="https://integrate.api.nvidia.com/v1")
+
+
 def _make_failover(
     pairs: list,
     events: Optional[list] = None,
@@ -225,6 +233,10 @@ class TestLLMFactory:
             openrouter_model="inclusionai/ling-3.0-flash-fin:free",
             openrouter_base_url="https://openrouter.ai/api/v1",
             openrouter_max_context_tokens=12000,
+            nvidia_api_key="nvapi-fake",
+            nvidia_model="meta/llama-3.3-70b-instruct",
+            nvidia_base_url="https://integrate.api.nvidia.com/v1",
+            nvidia_max_context_tokens=12000,
             llm_temperature=0.0,
             llm_max_context_tokens=5000,
             llm_max_iterations=5,
@@ -257,6 +269,15 @@ class TestLLMFactory:
         assert cfg.model == "inclusionai/ling-3.0-flash-fin:free"
         assert cfg.has_credentials()
 
+    def test_primary_config_is_nvidia(self):
+        s = self._settings(llm_provider="nvidia")
+        factory = LLMFactory(settings=s)
+        cfg = factory.primary_config()
+        assert cfg.name == "nvidia"
+        assert cfg.model == "meta/llama-3.3-70b-instruct"
+        assert cfg.has_credentials()
+        assert cfg.base_url == "https://integrate.api.nvidia.com/v1"
+
     def test_primary_config_is_openai(self):
         s = self._settings(llm_provider="openai")
         factory = LLMFactory(settings=s)
@@ -265,10 +286,10 @@ class TestLLMFactory:
         assert cfg.has_credentials()
 
     def test_fallback_configs_ordered(self):
-        s = self._settings(llm_fallback_providers="gemini,openai")
+        s = self._settings(llm_fallback_providers="openrouter,nvidia")
         factory = LLMFactory(settings=s)
         fallbacks = factory.fallback_configs()
-        assert [c.name for c in fallbacks] == ["gemini", "openai"]
+        assert [c.name for c in fallbacks] == ["openrouter", "nvidia"]
 
     def test_fallback_empty_when_not_configured(self):
         s = self._settings(llm_fallback_providers="")
@@ -298,12 +319,47 @@ class TestLLMFactory:
         with pytest.raises(AgentConfigurationError, match="Unknown provider"):
             factory.primary_config()
 
+    def test_build_nvidia_missing_key_raises(self):
+        from aml_copilot.exceptions import AgentConfigurationError
+        from aml_copilot.llm.factory import build_chat_model
+        cfg = ProviderConfig(name="nvidia", model="meta/llama-3.3-70b-instruct", api_key=None)
+        with pytest.raises(AgentConfigurationError, match="NVIDIA API key not configured"):
+            build_chat_model(cfg)
+
 
 # ---------------------------------------------------------------------------
 # 4. FailoverLLM core behaviour
 # ---------------------------------------------------------------------------
 
 class TestFailoverLLM:
+    def test_three_tier_failover_groq_openrouter_nvidia(self):
+        """Verify failover proceeds groq -> openrouter -> nvidia if first two fail with retryable errors."""
+        exc1 = Exception("429 TPM limit exceeded")
+        exc1.status_code = 429  # type: ignore[attr-defined]
+        exc2 = Exception("503 Service Unavailable")
+        exc2.status_code = 503  # type: ignore[attr-defined]
+
+        groq_mock = _failing_llm(exc1)
+        openrouter_mock = _failing_llm(exc2)
+        nvidia_mock = _fake_llm("nvidia response")
+
+        events: list = []
+        flm = _make_failover(
+            [
+                (_groq_config(), groq_mock),
+                (_openrouter_config(), openrouter_mock),
+                (_nvidia_config(), nvidia_mock),
+            ],
+            events,
+        )
+
+        msgs = [HumanMessage(content="analyze transactions")]
+        result = flm._generate(msgs)
+        assert result.generations[0].message.content == "nvidia response"
+        groq_mock.invoke.assert_called_once()
+        openrouter_mock.invoke.assert_called_once()
+        nvidia_mock.invoke.assert_called_once()
+
     def test_primary_succeeds_no_fallback_attempted(self):
         groq_mock = _fake_llm("groq response")
         gemini_mock = _fake_llm("gemini response")

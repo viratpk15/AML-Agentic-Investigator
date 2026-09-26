@@ -22,6 +22,7 @@ _DEFAULTS: dict[str, str] = {
     "groq": "openai/gpt-oss-120b",
     "gemini": "gemini-3.8-flash",
     "openrouter": "inclusionai/ling-3.0-flash-fin:free",
+    "nvidia": "meta/llama-3.3-70b-instruct",
     "openai": "gpt-4o-mini",
 }
 
@@ -29,7 +30,7 @@ _DEFAULTS: dict[str, str] = {
 def build_chat_model(config: ProviderConfig) -> BaseChatModel:
     """Instantiate a LangChain-compatible chat model for the given provider config.
 
-    Supported providers: 'groq', 'gemini', 'openai'
+    Supported providers: 'groq', 'gemini', 'openrouter', 'nvidia', 'openai'
 
     Raises:
         AgentConfigurationError: If API key is missing or provider is unsupported.
@@ -42,11 +43,13 @@ def build_chat_model(config: ProviderConfig) -> BaseChatModel:
         return _build_gemini(config)
     if name == "openrouter":
         return _build_openrouter(config)
+    if name == "nvidia":
+        return _build_nvidia(config)
     if name == "openai":
         return _build_openai(config)
 
     raise AgentConfigurationError(
-        f"Unsupported LLM provider '{name}'. Supported: 'groq', 'gemini', 'openrouter', 'openai'."
+        f"Unsupported LLM provider '{name}'. Supported: 'groq', 'gemini', 'openrouter', 'nvidia', 'openai'."
     )
 
 
@@ -141,6 +144,28 @@ def _build_openrouter(config: ProviderConfig) -> BaseChatModel:
         raise AgentConfigurationError(f"Failed to initialize ChatOpenAI (OpenRouter): {exc}") from exc
 
 
+def _build_nvidia(config: ProviderConfig) -> BaseChatModel:
+    if not config.has_credentials():
+        raise AgentConfigurationError(
+            "NVIDIA API key not configured. Set NVIDIA_API_KEY in .env or environment."
+        )
+    try:
+        from langchain_openai import ChatOpenAI  # type: ignore
+
+        model = ChatOpenAI(
+            model=config.model,
+            temperature=config.temperature,
+            api_key=config.api_key,
+            base_url=config.base_url or "https://integrate.api.nvidia.com/v1",
+        )
+        logger.info(f"[LLM Factory] Initialized ChatOpenAI (NVIDIA) with model '{config.model}'")
+        return model
+    except ImportError:
+        raise AgentConfigurationError("langchain-openai is not installed.")
+    except Exception as exc:
+        raise AgentConfigurationError(f"Failed to initialize ChatOpenAI (NVIDIA): {exc}") from exc
+
+
 class LLMFactory:
     """Top-level factory that reads application Settings and produces ProviderConfigs.
 
@@ -209,6 +234,17 @@ class LLMFactory:
                 temperature=s.llm_temperature,
                 max_context_tokens=s.openrouter_max_context_tokens,
                 max_iterations=s.llm_max_iterations,
+                base_url=s.openrouter_base_url,
+            )
+        if name == "nvidia":
+            return ProviderConfig(
+                name="nvidia",
+                model=s.nvidia_model,
+                api_key=s.nvidia_api_key,
+                temperature=s.llm_temperature,
+                max_context_tokens=s.nvidia_max_context_tokens,
+                max_iterations=s.llm_max_iterations,
+                base_url=s.nvidia_base_url,
             )
         if name == "openai":
             return ProviderConfig(
@@ -221,5 +257,5 @@ class LLMFactory:
             )
 
         raise AgentConfigurationError(
-            f"Unknown provider '{name}'. Supported: 'groq', 'gemini', 'openrouter', 'openai'."
+            f"Unknown provider '{name}'. Supported: 'groq', 'gemini', 'openrouter', 'nvidia', 'openai'."
         )
