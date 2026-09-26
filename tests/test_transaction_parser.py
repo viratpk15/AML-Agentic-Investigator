@@ -31,6 +31,19 @@ def test_parse_date_valid():
     assert parse_date("2026-08-01") == dt.date(2026, 8, 1)
     assert parse_date("01/08/2026") == dt.date(2026, 8, 1)
     assert parse_date("01-08-2026") == dt.date(2026, 8, 1)
+    # Hyphenated month name (as seen in real-time bank statements)
+    assert parse_date("01-Jun-2026") == dt.date(2026, 6, 1)
+    assert parse_date("1-JUN-2026") == dt.date(2026, 6, 1)
+    assert parse_date("31-Aug-2026") == dt.date(2026, 8, 31)
+    # Slashes and dots with month names
+    assert parse_date("01/Jun/2026") == dt.date(2026, 6, 1)
+    assert parse_date("01.Jun.2026") == dt.date(2026, 6, 1)
+    # US and alternate formats
+    assert parse_date("Jun 01, 2026") == dt.date(2026, 6, 1)
+    assert parse_date("June 1, 2026") == dt.date(2026, 6, 1)
+    assert parse_date("2026/06/01") == dt.date(2026, 6, 1)
+    assert parse_date("2026.06.01") == dt.date(2026, 6, 1)
+    assert parse_date("01.06.2026") == dt.date(2026, 6, 1)
 
 
 def test_parse_date_invalid():
@@ -453,3 +466,82 @@ def test_parse_100_transactions_multi_page_resilience():
     assert stmt.account_number == "ACC-CORP-10088"
     assert stmt.transactions[0].transaction_id == "TXN001"
     assert stmt.transactions[-1].transaction_id == "TXN100"
+
+
+def test_parse_adjacent_line_metadata_and_currency_headers():
+    """Verify parser extracts metadata when labels and values are on separate adjacent lines with currency headers."""
+    sample_text = (
+        "Customer Name\n"
+        "Virat\n"
+        "Account Number\n"
+        "XX7842\n"
+        "Statement Period\n"
+        "01-Jun-2026 to 31-Aug-2026\n"
+        "Transaction Details\n"
+        "Date\n"
+        "Txn ID\n"
+        "Description\n"
+        "Debit (₹)\n"
+        "Credit (₹)\n"
+        "Balance (₹)\n"
+        "01-Jun-2026\n"
+        "TXN1001\n"
+        "SALARY CREDIT - TECH CORP\n"
+        "—\n"
+        "125,000.00\n"
+        "250,000.00\n"
+        "02-Jun-2026\n"
+        "TXN1002\n"
+        "GROCERY EXPENSE\n"
+        "4,500.00\n"
+        "—\n"
+        "245,500.00\n"
+    )
+    doc = PDFDocumentExtraction(
+        file_path="sample.pdf",
+        file_name="sample.pdf",
+        total_pages=1,
+        pages=[PDFPage(page_number=1, text=sample_text, is_empty=False)],
+    )
+    stmt = parse_transactions(doc)
+    assert stmt.customer_name == "Virat"
+    assert stmt.account_number == "XX7842"
+    assert stmt.statement_period == "01-Jun-2026 to 31-Aug-2026"
+    assert len(stmt.transactions) == 2
+    assert stmt.transactions[0].transaction_id == "TXN1001"
+    assert stmt.transactions[0].date == dt.date(2026, 6, 1)
+    assert stmt.transactions[0].credit == 125000.0
+    assert stmt.transactions[1].transaction_id == "TXN1002"
+    assert stmt.transactions[1].debit == 4500.0
+
+
+def test_parse_virat_production_stress_statement_pdf():
+    """Verify parsing the real-world 100-transaction production stress PDF."""
+    pdf_path = STATEMENTS_DIR / "Virat_AML_Production_E2E_Stress_Statement.pdf"
+    if not pdf_path.exists():
+        pytest.skip("Virat_AML_Production_E2E_Stress_Statement.pdf not present in test environment")
+
+    doc = extract_pdf_text(pdf_path)
+    assert doc.total_pages >= 1
+
+    stmt = parse_transactions(doc)
+    assert isinstance(stmt, TransactionStatement)
+    assert stmt.customer_name == "Virat"
+    assert stmt.account_number == "XX7842"
+    assert "01-Jun-2026" in (stmt.statement_period or "")
+    assert len(stmt.transactions) == 100
+
+    # Verify first transaction (TXN1001)
+    t0 = stmt.transactions[0]
+    assert t0.transaction_id == "TXN1001"
+    assert t0.date == dt.date(2026, 6, 1)
+    assert t0.credit == 125000.0
+    assert t0.debit is None
+
+    # Verify last transaction (TXN1100)
+    t_last = stmt.transactions[-1]
+    assert t_last.transaction_id == "TXN1100"
+    assert t_last.date == dt.date(2026, 8, 31)
+    assert t_last.debit == 3200.0
+    assert t_last.credit is None
+

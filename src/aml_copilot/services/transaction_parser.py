@@ -32,11 +32,31 @@ CHANNEL_SUFFIXES = {
 }
 
 DATE_PATTERNS = [
-    (re.compile(r"^\d{1,2}\s+[A-Za-z]{3}\s+\d{4}$"), "%d %b %Y"),
-    (re.compile(r"^\d{1,2}\s+[A-Za-z]{4,}\s+\d{4}$"), "%d %B %Y"),
-    (re.compile(r"^\d{4}-\d{2}-\d{2}$"), "%Y-%m-%d"),
-    (re.compile(r"^\d{1,2}/\d{1,2}/\d{4}$"), "%d/%m/%Y"),
-    (re.compile(r"^\d{1,2}-\d{1,2}-\d{4}$"), "%d-%m-%Y"),
+    # 01 Aug 2026, 01 August 2026
+    (re.compile(r"^\d{1,2}\s+[A-Za-z]{3,}\s+\d{4}$", re.IGNORECASE), ("%d %b %Y", "%d %B %Y")),
+    # 01-Jun-2026, 01-June-2026, 1-JUN-2026
+    (re.compile(r"^\d{1,2}-[A-Za-z]{3,}-\d{4}$", re.IGNORECASE), ("%d-%b-%Y", "%d-%B-%Y")),
+    # 01/Jun/2026, 01/June/2026
+    (re.compile(r"^\d{1,2}/[A-Za-z]{3,}/\d{4}$", re.IGNORECASE), ("%d/%b/%Y", "%d/%B/%Y")),
+    # 01.Jun.2026, 01.June.2026
+    (re.compile(r"^\d{1,2}\.[A-Za-z]{3,}\.\d{4}$", re.IGNORECASE), ("%d.%b.%Y", "%d.%B.%Y")),
+    # Jun 01, 2026, June 1, 2026, Jun 01 2026
+    (
+        re.compile(r"^[A-Za-z]{3,}\s+\d{1,2},?\s+\d{4}$", re.IGNORECASE),
+        ("%b %d %Y", "%b %d, %Y", "%B %d %Y", "%B %d, %Y"),
+    ),
+    # Standard ISO 2026-06-01
+    (re.compile(r"^\d{4}-\d{2}-\d{2}$"), ("%Y-%m-%d",)),
+    # 2026/06/01
+    (re.compile(r"^\d{4}/\d{2}/\d{2}$"), ("%Y/%m/%d",)),
+    # 2026.06.01
+    (re.compile(r"^\d{4}\.\d{2}\.\d{2}$"), ("%Y.%m.%d",)),
+    # Numeric with slash: 01/06/2026, 06/01/2026
+    (re.compile(r"^\d{1,2}/\d{1,2}/\d{4}$"), ("%d/%m/%Y", "%m/%d/%Y")),
+    # Numeric with hyphen: 01-06-2026, 06-01-2026
+    (re.compile(r"^\d{1,2}-\d{1,2}-\d{4}$"), ("%d-%m-%Y", "%m-%d-%Y")),
+    # Numeric with dot: 01.06.2026
+    (re.compile(r"^\d{1,2}\.\d{1,2}\.\d{4}$"), ("%d.%m.%Y", "%m.%d.%Y")),
 ]
 
 # Standard header / footer line patterns that occur across pages and tables
@@ -51,6 +71,9 @@ _HEADER_FOOTER_PATTERNS = [
     re.compile(r"(?i)^Synthetic (Bank )?Transaction Statement.*"),
     re.compile(r"(?i)^Synthetic Stress Statement.*"),
     re.compile(r"(?i)^Bank Statement.*"),
+    re.compile(r"(?i)^Transaction\s+Details$"),
+    re.compile(r"(?i)^(Opening|Closing)\s+Balance$"),
+    re.compile(r"(?i)^Transaction\s+Count(\s*:\s*\d+)?$"),
     # Multi-column table header lines (must have Txn/Transaction AND Date AND an amount/flow indicator)
     re.compile(
         r"(?i)^.*?\b(Txn|Transaction)\b.*?\bDate\b.*?\b(Amount|Debit|Credit|Flow|Balance|Description|Particulars)\b.*$"
@@ -63,9 +86,9 @@ _HEADER_FOOTER_PATTERNS = [
     re.compile(r"(?i)^(Date|Txn\s+Date|Transaction\s+Date|Posting\s+Date|Value\s+Date)$"),
     re.compile(r"(?i)^(Flow|Flow\s+Type|Transaction\s+Type|Dr\s*/\s*Cr)$"),
     re.compile(r"(?i)^(Amount|Amount\s*\([A-Za-z]+\)|Amount\s*in\s*[A-Za-z]+)$"),
-    re.compile(r"(?i)^(Debit\s*\([A-Za-z]+\)|Withdrawals?)$"),
-    re.compile(r"(?i)^(Credit\s*\([A-Za-z]+\)|Deposits?)$"),
-    re.compile(r"(?i)^(Balance|Balance\s*\([A-Za-z]+\)|Closing\s+Balance)$"),
+    re.compile(r"(?i)^(Debit\s*\([A-Za-z|₹$€£]+\)|Withdrawals?)$"),
+    re.compile(r"(?i)^(Credit\s*\([A-Za-z|₹$€£]+\)|Deposits?)$"),
+    re.compile(r"(?i)^(Balance|Balance\s*\([A-Za-z|₹$€£]+\)|Closing\s+Balance)$"),
     re.compile(r"(?i)^(Counterparty|Beneficiary|Party|Entity)$"),
     re.compile(r"(?i)^(Description|Particulars|Narration|Transaction\s+Details)$"),
     re.compile(r"(?i)^(Reference|Ref\s+No\.?|Reference\s+No\.?|Chq/Ref\s+No\.?|Cheque\s+No\.?)$"),
@@ -85,12 +108,19 @@ def is_header_or_footer(line: str) -> bool:
 def parse_date(raw_date: str) -> Optional[dt.date]:
     """Parse a date string into a datetime.date object using standard formats."""
     cleaned = raw_date.strip()
-    for pattern, fmt in DATE_PATTERNS:
+    if not cleaned:
+        return None
+    cleaned_norm = re.sub(r"\s*,\s*", ", ", cleaned)
+    for pattern, fmts in DATE_PATTERNS:
         if pattern.match(cleaned):
-            try:
-                return dt.datetime.strptime(cleaned, fmt).date()
-            except ValueError:
-                continue
+            for fmt in fmts:
+                try:
+                    return dt.datetime.strptime(cleaned.title(), fmt).date()
+                except ValueError:
+                    try:
+                        return dt.datetime.strptime(cleaned_norm.title(), fmt).date()
+                    except ValueError:
+                        continue
     return None
 
 
@@ -203,9 +233,14 @@ def extract_metadata(
     ]
     _PERIOD_PATS = [
         re.compile(r"(?i)^Statement\s+[Pp]eriod\s*:\s*(.+?)(?:\s{2,}|$)"),
+        re.compile(r"(?i)^Period\s*:\s*(.+?)(?:\s{2,}|$)"),
     ]
 
-    for line in lines:
+    _LABEL_CUSTOMER = re.compile(r"(?i)^(?:Account\s+Holder|Customer\s+Name|Customer\s+Account\s+Name|Customer)$")
+    _LABEL_ACCOUNT = re.compile(r"(?i)^(?:Account\s+(?:Number|No\.?)|Account)$")
+    _LABEL_PERIOD = re.compile(r"(?i)^(?:Statement\s+[Pp]eriod|Period)$")
+
+    for i, line in enumerate(lines):
         line_clean = line.strip()
         if not line_clean:
             continue
@@ -215,27 +250,39 @@ def extract_metadata(
                 m = pat.search(line_clean)
                 if m:
                     val = m.group(1).strip()
-                    if val:
+                    if val and not is_header_or_footer(val):
                         customer_name = val
                     break
+            if not customer_name and _LABEL_CUSTOMER.match(line_clean) and i + 1 < len(lines):
+                nxt = lines[i + 1].strip()
+                if nxt and not is_header_or_footer(nxt):
+                    customer_name = nxt
 
         if not account_number:
             for pat in _ACCOUNT_PATS:
                 m = pat.search(line_clean)
                 if m:
                     val = m.group(1).strip()
-                    if val:
+                    if val and not is_header_or_footer(val):
                         account_number = val
                     break
+            if not account_number and _LABEL_ACCOUNT.match(line_clean) and i + 1 < len(lines):
+                nxt = lines[i + 1].strip()
+                if nxt and not is_header_or_footer(nxt):
+                    account_number = nxt
 
         if not statement_period:
             for pat in _PERIOD_PATS:
                 m = pat.search(line_clean)
                 if m:
                     val = m.group(1).strip()
-                    if val:
+                    if val and not is_header_or_footer(val):
                         statement_period = val
                     break
+            if not statement_period and _LABEL_PERIOD.match(line_clean) and i + 1 < len(lines):
+                nxt = lines[i + 1].strip()
+                if nxt and not is_header_or_footer(nxt):
+                    statement_period = nxt
 
     return customer_name, account_number, statement_period
 
