@@ -39,7 +39,9 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
+    # Mount routes at root and with /api prefix for maximum client compatibility
     app.include_router(router)
+    app.include_router(router, prefix="/api")
     return app
 
 
