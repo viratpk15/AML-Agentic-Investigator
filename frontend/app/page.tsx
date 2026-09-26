@@ -196,10 +196,18 @@ export default function Home() {
         setEngineState("COMPLETE");
         setActiveNode("report");
         break;
-      case "INVESTIGATION_FAILED":
+      case "INVESTIGATION_FAILED": {
         setEngineState("ERROR");
         setActiveNode(null);
+        // Build a structured diagnostic message from backend metadata
+        const meta = event.metadata || {};
+        const stage = meta.error_stage ? `during ${meta.error_stage.replace(/_/g, " ")}` : "";
+        const errType = meta.error_type ? `${meta.error_type}: ` : "";
+        const reqId = meta.request_id ? ` [ID: ${meta.request_id}]` : "";
+        const humanMsg = `Investigation failed ${stage}. ${errType}${event.message}${reqId}`.trim();
+        setErrorMessage(humanMsg);
         break;
+      }
     }
   };
 
@@ -378,9 +386,18 @@ export default function Home() {
             activeSubscriptionRef.current = null;
           }
           setEngineState("ERROR");
-          const errorText = statusData.error || "Investigation failed on server.";
-          setErrorMessage(errorText);
-          addLog("Error", errorText, "error");
+          const rawError = statusData.error || "Investigation failed on server.";
+          // Parse stage/type from structured error string: "[stage] ExcType: message"
+          const stageMatch = rawError.match(/^\[([\w_]+)\]\s*/);
+          const stageLabel = stageMatch
+            ? `during ${stageMatch[1].replace(/_/g, " ")}`
+            : "";
+          const cleanError = stageMatch ? rawError.slice(stageMatch[0].length) : rawError;
+          const humanMsg = stageLabel
+            ? `Investigation failed ${stageLabel}. ${cleanError}`
+            : cleanError;
+          setErrorMessage(humanMsg);
+          addLog("Error", humanMsg, "error");
           setIsLoading(false);
         }
       };

@@ -76,17 +76,27 @@ async def _run_async_investigation(
         statement = parse_transactions(doc)
 
     except Exception as exc:
-        logger.error(f"[Async Investigation {investigation_id}] Ingestion/Parsing error: {exc}")
+        exc_type = type(exc).__name__
+        exc_msg = str(exc)
+        logger.error(
+            f"[{investigation_id}] STAGE=ingestion_parsing | {exc_type}: {exc_msg}",
+            exc_info=True,
+        )
         bus.publish_sync(
             InvestigationEvent(
                 investigation_id=investigation_id,
                 event_type=EventType.INVESTIGATION_FAILED,
                 status="FAILED",
-                message=f"Statement parsing failed: {str(exc)}",
-                metadata={"error": str(exc)},
+                message=f"Statement parsing failed: {exc_msg}",
+                metadata={
+                    "error_type": exc_type,
+                    "error_stage": "ingestion_parsing",
+                    "error": exc_msg,
+                    "request_id": investigation_id,
+                },
             )
         )
-        bus.set_error(f"Statement parsing error: {str(exc)}")
+        bus.set_error(f"[ingestion_parsing] {exc_type}: {exc_msg}")
         return
     finally:
         if temp_path and temp_path.exists():
@@ -181,17 +191,27 @@ async def _run_async_investigation(
             logger.warning(f"Could not persist run to history: {hist_err}")
 
     except Exception as exc:
-        logger.error(f"[Async Investigation {investigation_id}] Execution error: {exc}")
+        exc_type = type(exc).__name__
+        exc_msg = str(exc)
+        logger.error(
+            f"[{investigation_id}] STAGE=investigation_execution | {exc_type}: {exc_msg}",
+            exc_info=True,
+        )
         bus.publish_sync(
             InvestigationEvent(
                 investigation_id=investigation_id,
                 event_type=EventType.INVESTIGATION_FAILED,
                 status="FAILED",
-                message=f"Investigation workflow error: {str(exc)}",
-                metadata={"error": str(exc)},
+                message=f"Investigation failed during execution: {exc_msg}",
+                metadata={
+                    "error_type": exc_type,
+                    "error_stage": "investigation_execution",
+                    "error": exc_msg,
+                    "request_id": investigation_id,
+                },
             )
         )
-        bus.set_error(str(exc))
+        bus.set_error(f"[investigation_execution] {exc_type}: {exc_msg}")
 
 
 def _build_demo_investigation_result(question: str) -> InvestigationResult:
@@ -479,17 +499,27 @@ async def _run_demo_async_investigation(
             logger.warning(f"Could not persist demo run to history: {hist_err}")
 
     except Exception as exc:
-        logger.error(f"[Demo Async Investigation] Error: {exc}")
+        exc_type = type(exc).__name__
+        exc_msg = str(exc)
+        logger.error(
+            f"[{investigation_id}] STAGE=demo_execution | {exc_type}: {exc_msg}",
+            exc_info=True,
+        )
         bus.publish_sync(
             InvestigationEvent(
                 investigation_id=investigation_id,
                 event_type=EventType.INVESTIGATION_FAILED,
                 status="FAILED",
-                message=f"Demo execution failed: {str(exc)}",
-                metadata={"error": str(exc)},
+                message=f"Demo investigation failed: {exc_msg}",
+                metadata={
+                    "error_type": exc_type,
+                    "error_stage": "demo_execution",
+                    "error": exc_msg,
+                    "request_id": investigation_id,
+                },
             )
         )
-        bus.set_error(str(exc))
+        bus.set_error(f"[demo_execution] {exc_type}: {exc_msg}")
 
 
 # ---------------------------------------------------------------------------

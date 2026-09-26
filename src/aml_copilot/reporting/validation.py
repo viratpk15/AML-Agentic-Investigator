@@ -375,8 +375,11 @@ def validate_report_evidence(
                 canonical_entity_names.add(rag.title.strip().upper())
 
     allowed_domain_terms = {
+        # Regulatory / compliance bodies
         "PMLA", "FATF", "FIU", "RBI", "SAR", "STR", "AML", "KYC", "CDD", "EDD",
+        # Payment / currency systems
         "INR", "IMPS", "NEFT", "RTGS", "UPI", "ATM", "GST", "ITR", "PEP", "CASH",
+        # General financial vocabulary
         "SALARY", "RENT", "TRANSFER", "ISOLATION", "FOREST", "AI", "LLM", "COPILOT",
         "PASS", "FAIL", "HIGH", "MEDIUM", "LOW", "CREDIT", "DEBIT", "NET", "FLOW",
         "RULE", "FINDING", "ANOMALY", "TRANSACTION", "STATEMENT", "CUSTOMER", "ACCOUNT",
@@ -389,6 +392,26 @@ def validate_report_evidence(
         "RAPID", "MOVEMENT", "CONDUIT", "SOURCE", "PROVENANCE", "CHECK", "QUEUE",
         "PARTIAL", "MAX", "ITERATIONS", "REACHED", "STATUS", "NORMAL", "BUDGET",
         "EXCEEDED", "EXECUTION", "COMPLETED", "SCREENING", "PERIOD", "OBJECTIVE",
+        # Investigation lifecycle / report structural terms (extended)
+        "PRIORITY", "FINDINGS", "KEY", "LARGE", "THRESHOLD", "BURST", "KNOWLEDGE",
+        "BASE", "REFERENCE", "COMPLETION", "HUMAN", "ANALYTICS", "PROFILING",
+        "NETWORK", "GRAPH", "NODES", "EDGES", "COUNTERPARTY", "COUNTERPARTIES",
+        "CONVERGENCE", "SIGNAL", "SIGNALS", "DETECTION", "MONITORING", "ANALYSIS",
+        "INFLOW", "OUTFLOW", "TURNOVER", "RATIO", "BASELINE", "AVERAGE", "PEAK",
+        "DIRECTION", "DOMAIN", "MULTI", "INDEPENDENT", "CROSS", "MULTI-SIGNAL",
+        "STAR", "HUB", "TOPOLOGY", "TYPOLOGY", "PATTERN", "PATTERNS", "VOLUME",
+        "SERIES", "WINDOW", "AGENT", "WORKFLOW", "ORCHESTRATOR", "CRITIC",
+        "AUDIT", "VALIDATION", "VERIFIED", "UNVERIFIED", "GROUNDED", "CANONICAL",
+        "NEXT", "STEPS", "RECOMMENDED", "CORPORATE", "REGISTRY", "BENEFICIAL",
+        "OWNERSHIP", "ONBOARDING", "ESCALATE", "INSTITUTIONAL", "PROCEDURES",
+        "WARRANTED", "INSPECTION", "IMMEDIATE", "MANDATORY", "OFFICER", "REVIEW",
+        "IDENTIFIED", "FLAGGED", "DETECTED", "ANALYZED", "PROCESSED", "OBSERVED",
+        "TRIGGERED", "GENERATED", "SYNTHESIZED", "REFERENCED", "CONFIRMED",
+        "ACCOUNTS", "TRANSACTIONS", "FINDINGS", "SIGNALS", "ITEMS", "RECORDS",
+        # Common English connectors / financial nouns appearing in narrative phrases
+        "OF", "AND", "FOR", "IN", "THE", "WITH", "FROM", "TO",
+        "FUNDS", "AMOUNT", "AMOUNTS", "TRANSACTION", "ACCOUNT", "ACCOUNTS",
+        "CASH", "PAYMENT", "PAYMENTS", "DEPOSIT", "DEPOSITS", "WITHDRAWAL",
     }
 
     potential_entities = re.findall(r"\b[A-Z]{3,}(?:\s+[A-Z]{3,})+\b", all_report_text)
