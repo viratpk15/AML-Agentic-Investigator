@@ -58,9 +58,9 @@ class Settings(BaseSettings):
     # NVIDIA provider (build.nvidia.com)
     # ---------------------------------------------------------------------------
     nvidia_api_key: Optional[str] = None
-    nvidia_model: str = "meta/llama-3.2-11b-vision-instruct"
+    nvidia_model: str = "nvidia/nemotron-3-ultra-550b-a55b"
     nvidia_base_url: str = "https://integrate.api.nvidia.com/v1"
-    nvidia_max_context_tokens: int = 12000
+    nvidia_max_context_tokens: int = 16384
     """NVIDIA context token budget."""
 
     # ---------------------------------------------------------------------------

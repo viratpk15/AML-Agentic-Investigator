@@ -22,6 +22,10 @@ services:
         sync: false
       - key: NVIDIA_API_KEY
         sync: false
+      - key: NVIDIA_MODEL
+        value: "nvidia/nemotron-3-ultra-550b-a55b"
+      - key: NVIDIA_MAX_CONTEXT_TOKENS
+        value: "16384"
       - key: OPENROUTER_API_KEY
         sync: false
       - key: GEMINI_API_KEY

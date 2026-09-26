@@ -22,7 +22,7 @@ _DEFAULTS: dict[str, str] = {
     "groq": "openai/gpt-oss-120b",
     "gemini": "gemini-3.8-flash",
     "openrouter": "inclusionai/ling-3.0-flash-fin:free",
-    "nvidia": "meta/llama-3.2-11b-vision-instruct",
+    "nvidia": "nvidia/nemotron-3-ultra-550b-a55b",
     "openai": "gpt-4o-mini",
 }
 
@@ -153,9 +153,9 @@ def _build_nvidia(config: ProviderConfig) -> BaseChatModel:
     if model_name in ("meta/llama-3.3-70b-instruct", "meta/llama3-70b-instruct", "meta/llama-3.3-70b"):
         logger.warning(
             f"[LLM Factory] NVIDIA model '{model_name}' has reached EOL (HTTP 410). "
-            "Auto-switching to active model 'meta/llama-3.2-11b-vision-instruct'."
+            "Auto-switching to active model 'nvidia/nemotron-3-ultra-550b-a55b'."
         )
-        model_name = "meta/llama-3.2-11b-vision-instruct"
+        model_name = "nvidia/nemotron-3-ultra-550b-a55b"
     try:
         from langchain_openai import ChatOpenAI  # type: ignore
 
@@ -246,7 +246,7 @@ class LLMFactory:
         if name == "nvidia":
             nv_model = s.nvidia_model
             if nv_model in ("meta/llama-3.3-70b-instruct", "meta/llama3-70b-instruct", "meta/llama-3.3-70b"):
-                nv_model = "meta/llama-3.2-11b-vision-instruct"
+                nv_model = "nvidia/nemotron-3-ultra-550b-a55b"
             return ProviderConfig(
                 name="nvidia",
                 model=nv_model,
