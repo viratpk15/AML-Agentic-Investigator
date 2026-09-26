@@ -803,6 +803,7 @@ async def investigate_statement(
             include_profile=True,
             include_network=True,
             enable_critic=True,
+            settings=settings,
         )
     except AgentConfigurationError as exc:
         raise HTTPException(
